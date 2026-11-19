@@ -1,0 +1,6 @@
+# Sistema operativo y editores (lo de Unity está en MyLifesGame/.gitignore)
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.vs/

@@ -176,11 +176,11 @@ public class Juego : MonoBehaviour
         Image fondo = UIFabrica.Caja(canvas, "Aviso", new Color(0.29f, 0.2f, 0.15f, 0.92f));
         fondo.raycastTarget = false;
         RectTransform rt = fondo.rectTransform;
-        rt.anchorMin = new Vector2(0.05f, 1);
-        rt.anchorMax = new Vector2(0.95f, 1);
-        rt.pivot = new Vector2(0.5f, 1);
+        rt.anchorMin = new Vector2(0.05f, 0);
+        rt.anchorMax = new Vector2(0.95f, 0);
+        rt.pivot = new Vector2(0.5f, 0);
         rt.sizeDelta = new Vector2(0, 150);
-        rt.anchoredPosition = new Vector2(0, -40);
+        rt.anchoredPosition = new Vector2(0, Pantalla.AltoBarra + 40);
         aviso = UIFabrica.Texto(fondo.transform, "", 34, Paleta.Blanco, TextAnchor.MiddleCenter, FontStyle.Bold);
         UIFabrica.Anclar(aviso.rectTransform, 0.03f, 0, 0.97f, 1);
         fondo.gameObject.SetActive(false);

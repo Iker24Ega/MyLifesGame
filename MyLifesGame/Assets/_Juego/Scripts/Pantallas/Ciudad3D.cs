@@ -5,12 +5,14 @@ using MyLifesGame.Motor;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 /// <summary>
-/// Ciudad 3D inventada, hecha con formas básicas: calles en cuadrícula, 8 solares con edificios,
-/// una plaza con fuente, árboles y el avatar, que camina solo por las calles hasta el edificio elegido.
-/// Es un prototipo: el arte definitivo llegará más adelante (estilo de las imágenes de referencia).
+/// Ciudad 3D inventada con los kits de Kenney (CC0): 8 solares jugables cuyo edificio cambia según el papel
+/// que le da el jugador, un barrio decorativo alrededor, luz cálida de tarde, postproceso suave,
+/// pines medallón y el avatar, que camina solo por las calles hasta el edificio elegido.
 /// </summary>
 public class Ciudad3D : MonoBehaviour
 {
@@ -23,79 +25,196 @@ public class Ciudad3D : MonoBehaviour
     public const int IndiceCasa = 1;
 
     private static readonly float[] Calles = { -21f, -7f, 7f, 21f };
-    private static readonly string[] Fachadas = { "F4D9C6", "CFE5D8", "D6E2F2", "F6E6B8", "E9D5EE", "F2CFC4", "D9EAD3", "F1E3D3" };
+    private const float AnchoSolar = 8.5f;
 
     /// <summary>Se llama al tocar un edificio (índice del solar).</summary>
     public event Action<int> AlTocarEdificio;
-
     /// <summary>Si es false, no responde a toques (por ejemplo, con un menú abierto).</summary>
     public bool Activa;
     public bool Caminando { get; private set; }
 
-    private Juego juego;
     private DatosCiudad datos;
     private Camera camara;
-    private Transform avatar;
-    private Renderer sudadera;
+    private Transform avatar, cuerpo, brazoI, brazoD, piernaI, piernaD;
+    private Renderer[] sudadera;
     private float zoom = 1f;
-    private readonly List<Edificio> edificios = new List<Edificio>();
+    private Vector3 desplazamiento;          // arrastre de la cámara
+    private Vector2 inicioPuntero;
+    private bool arrastrando, pulsado;
+    private TipoEstadoAvatar estadoAvatar = TipoEstadoAvatar.Normal;
+    private readonly List<Solar> solares = new List<Solar>();
     private readonly List<Transform> carteles = new List<Transform>();
     private readonly Dictionary<Color, Material> materiales = new Dictionary<Color, Material>();
 
-    private class Edificio
+    private class Solar
     {
         public Vector3 centro;
-        public float ancho, alto, fondo;
-        public Renderer fachada;
-        public Renderer pin;
-        public Text letrero;
-        public GameObject cartel;
-        public GameObject interrogacion;
-        public Vector3 Puerta { get { return new Vector3(centro.x, 0, centro.z + 0.5f - fondo / 2f - 1.6f); } }
+        public Transform raiz;
+        public GameObject modelo;
+        public string rolMostrado = null;
+        public GameObject medallon;
+        public Image fondoMedallon;
+        public Text letraMedallon;
+        public Text etiqueta;
+        public GameObject pastilla;
+        public float alto = 6f;
+        public Vector3 Puerta { get { return new Vector3(centro.x, 0, centro.z - 5.6f); } }
     }
+
+    // ---------------------------------------------------------------- construcción
 
     public void Construir(Juego juego, DatosCiudad datos)
     {
-        this.juego = juego;
         this.datos = datos;
         while (datos.roles.Count < Solares.Length) datos.roles.Add("");
         if (string.IsNullOrEmpty(datos.roles[IndiceCasa])) datos.roles[IndiceCasa] = "casa";
         if (datos.edificioActual < 0) datos.edificioActual = IndiceCasa;
 
-        camara = Camera.main;
-        if (camara == null) camara = new GameObject("Cámara", typeof(Camera)).GetComponent<Camera>();
-        camara.fieldOfView = 45f;
-        camara.clearFlags = CameraClearFlags.SolidColor;
-        camara.backgroundColor = Paleta.Hex("F3E9D8");
+        PrepararCamaraYLuz();
 
-        // Suelo, calles y plaza
-        Pieza(PrimitiveType.Plane, "Suelo", new Vector3(0, 0, 0), new Vector3(8, 1, 8), Paleta.Hex("CFE3B4"), true);
+        // Suelo, calles con acera y plaza
+        Pieza(PrimitiveType.Cube, "Césped", new Vector3(0, -0.05f, 0), new Vector3(140, 0.1f, 140), Paleta.Hex("A9CF8E"));
         foreach (float c in Calles)
         {
-            Pieza(PrimitiveType.Cube, "Calle", new Vector3(c, 0.03f, 0), new Vector3(3.5f, 0.06f, 46f), Paleta.Hex("D2C8BA"), false);
-            Pieza(PrimitiveType.Cube, "Calle", new Vector3(0, 0.03f, c), new Vector3(46f, 0.06f, 3.5f), Paleta.Hex("D2C8BA"), false);
+            Calle(new Vector3(c, 0, 0), true);
+            Calle(new Vector3(0, 0, c), false);
         }
-        Pieza(PrimitiveType.Cylinder, "Plaza", new Vector3(0, 0.05f, 0), new Vector3(9f, 0.05f, 9f), Paleta.Hex("E8DCCB"), false);
-        Pieza(PrimitiveType.Cylinder, "Fuente", new Vector3(0, 0.35f, 0), new Vector3(3.2f, 0.3f, 3.2f), Paleta.Hex("A9CBEA"), false);
-        Pieza(PrimitiveType.Cylinder, "Columna fuente", new Vector3(0, 1f, 0), new Vector3(0.6f, 0.8f, 0.6f), Paleta.Hex("EDE6DB"), false);
-
-        // Edificios
-        for (int i = 0; i < Solares.Length; i++) CrearEdificio(i);
-
-        // Árboles en las esquinas traseras de cada solar
-        foreach (Vector3 s in Solares)
+        Pieza(PrimitiveType.Cylinder, "Plaza", new Vector3(0, 0.06f, 0), new Vector3(9.5f, 0.06f, 9.5f), Paleta.Hex("EADFCF"));
+        Pieza(PrimitiveType.Cylinder, "Fuente", new Vector3(0, 0.4f, 0), new Vector3(3.6f, 0.35f, 3.6f), Paleta.Hex("F4EEE6"));
+        Pieza(PrimitiveType.Cylinder, "Agua", new Vector3(0, 0.62f, 0), new Vector3(3.1f, 0.06f, 3.1f), Paleta.Hex("8CC7E8"));
+        Pieza(PrimitiveType.Cylinder, "Columna", new Vector3(0, 1.3f, 0), new Vector3(0.55f, 0.75f, 0.55f), Paleta.Hex("F4EEE6"));
+        for (int i = 0; i < 4; i++)
         {
-            Arbol(s + new Vector3(4.6f, 0, 4.4f));
-            Arbol(s + new Vector3(-4.6f, 0, 4.4f));
+            float a = i * Mathf.PI / 2f + Mathf.PI / 4f;
+            Modelo("Ciudad/Suburban/planter", transform, new Vector3(Mathf.Cos(a) * 3.6f, 0.1f, Mathf.Sin(a) * 3.6f), 1.6f, 0f);
         }
 
+        for (int i = 0; i < Solares.Length; i++)
+        {
+            var s = new Solar { centro = Solares[i] };
+            s.raiz = new GameObject("Solar " + i).transform;
+            s.raiz.SetParent(transform, false);
+            s.raiz.gameObject.AddComponent<Lote>().indice = i;
+            var col = s.raiz.gameObject.AddComponent<BoxCollider>();
+            col.center = s.centro + new Vector3(0, 3f, 0);
+            col.size = new Vector3(10f, 6f, 10f);
+            CrearMedallon(s);
+            solares.Add(s);
+        }
+
+        Barrio();
         CrearAvatar();
-        avatar.position = edificios[datos.edificioActual].Puerta;
+        avatar.position = solares[datos.edificioActual].Puerta;
         ActualizarTodos();
         SituarCamara(true);
     }
 
-    // ---------------------------------------------------------------- piezas
+    private void PrepararCamaraYLuz()
+    {
+        camara = Camera.main;
+        if (camara == null) camara = new GameObject("Cámara", typeof(Camera)).GetComponent<Camera>();
+        camara.fieldOfView = 42f;
+        camara.clearFlags = CameraClearFlags.SolidColor;
+        camara.backgroundColor = Paleta.Hex("F6E7CF");
+        camara.farClipPlane = 400f;
+        var datosCam = camara.GetUniversalAdditionalCameraData();
+        if (datosCam != null)
+        {
+            datosCam.renderPostProcessing = true;
+            datosCam.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+        }
+
+        Light sol = null;
+        foreach (Light l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+            if (l.type == LightType.Directional) sol = l;
+        if (sol == null) sol = new GameObject("Sol", typeof(Light)).GetComponent<Light>();
+        sol.type = LightType.Directional;
+        sol.transform.rotation = Quaternion.Euler(42f, -38f, 0f);
+        sol.color = Paleta.Hex("FFE1B5");
+        sol.intensity = 1.35f;
+        sol.shadows = LightShadows.Soft;
+        sol.shadowStrength = 0.55f;
+
+        RenderSettings.ambientMode = AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = Paleta.Hex("C9DDF2");
+        RenderSettings.ambientEquatorColor = Paleta.Hex("F2E0C4");
+        RenderSettings.ambientGroundColor = Paleta.Hex("B4A486");
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = Paleta.Hex("F6E7CF");
+        RenderSettings.fogStartDistance = 70f;
+        RenderSettings.fogEndDistance = 160f;
+
+        // Postproceso suave y cálido
+        var go = new GameObject("Postproceso");
+        go.transform.SetParent(transform, false);
+        var vol = go.AddComponent<Volume>();
+        vol.isGlobal = true;
+        vol.priority = 50;
+        var perfil = ScriptableObject.CreateInstance<VolumeProfile>();
+        var bloom = perfil.Add<Bloom>(true);
+        bloom.intensity.Override(0.35f);
+        bloom.threshold.Override(1.05f);
+        var color = perfil.Add<ColorAdjustments>(true);
+        color.postExposure.Override(0.15f);
+        color.saturation.Override(8f);
+        color.contrast.Override(4f);
+        var blanco = perfil.Add<WhiteBalance>(true);
+        blanco.temperature.Override(8f);
+        var vineta = perfil.Add<Vignette>(true);
+        vineta.intensity.Override(0.18f);
+        vineta.smoothness.Override(0.5f);
+        var tono = perfil.Add<Tonemapping>(true);
+        tono.mode.Override(TonemappingMode.None);
+        vol.profile = perfil;
+    }
+
+    private void Calle(Vector3 centro, bool vertical)
+    {
+        Vector3 largo = vertical ? new Vector3(3.6f, 0.05f, 60f) : new Vector3(60f, 0.05f, 3.6f);
+        Vector3 acera = vertical ? new Vector3(5.2f, 0.08f, 60f) : new Vector3(60f, 0.08f, 5.2f);
+        Pieza(PrimitiveType.Cube, "Acera", centro + new Vector3(0, 0.02f, 0), acera, Paleta.Hex("EDE3D3"));
+        Pieza(PrimitiveType.Cube, "Calzada", centro + new Vector3(0, 0.05f, 0), largo, Paleta.Hex("B9B2A8"));
+        for (float d = -28f; d <= 28f; d += 4f)
+        {
+            Vector3 pos = centro + (vertical ? new Vector3(0, 0.085f, d) : new Vector3(d, 0.085f, 0));
+            Vector3 tam = vertical ? new Vector3(0.18f, 0.01f, 1.6f) : new Vector3(1.6f, 0.01f, 0.18f);
+            Pieza(PrimitiveType.Cube, "Raya", pos, tam, Paleta.Hex("F7F2EA"));
+        }
+    }
+
+    private void Barrio()
+    {
+        // Edificios decorativos alrededor (no se pueden tocar) para que la ciudad parezca grande
+        string[] bajos = { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n" };
+        string[] casas = { "a", "b", "c", "d", "e", "g", "h", "i", "j", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u" };
+        int k = 0;
+        for (int i = -2; i <= 2; i++)
+        {
+            float x = i * 14f;
+            Modelo("Ciudad/Suburban/tree-small", transform, new Vector3(x + 3f, 0, -27f), 2.2f, 0f);
+            Decorado(new Vector3(x, 0, 28f), k++, bajos, "Ciudad/Comercial/low-detail-building-", 9f, 180f);
+            if (i > -2 && i < 2)
+            {
+                Decorado(new Vector3(-28f, 0, x), k++, bajos, "Ciudad/Comercial/low-detail-building-", 9f, 90f);
+                Decorado(new Vector3(28f, 0, x), k++, casas, "Ciudad/Suburban/building-type-", 7.5f, -90f);
+            }
+        }
+        // Árboles a lo largo de las aceras
+        foreach (float c in Calles)
+            for (float d = -24f; d <= 24f; d += 12f)
+            {
+                Modelo("Ciudad/Suburban/tree-small", transform, new Vector3(c + 2.9f, 0, d + 3.5f), 2.2f, 0f);
+                Modelo("Ciudad/Suburban/tree-large", transform, new Vector3(d + 3.5f, 0, c - 2.9f), 2.8f, 0f);
+            }
+    }
+
+    private void Decorado(Vector3 pos, int k, string[] variantes, string ruta, float ancho, float giro)
+    {
+        Modelo(ruta + variantes[(k * 7) % variantes.Length], transform, pos, ancho, giro);
+    }
+
+    // ---------------------------------------------------------------- piezas y modelos
 
     private Material Mat(Color color)
     {
@@ -106,12 +225,12 @@ public class Ciudad3D : MonoBehaviour
         m = new Material(s);
         m.SetColor("_BaseColor", color);
         m.color = color;
-        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.1f);
+        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.12f);
         materiales[color] = m;
         return m;
     }
 
-    private GameObject Pieza(PrimitiveType tipo, string nombre, Vector3 pos, Vector3 escala, Color color, bool conColisor, Transform padre = null)
+    private GameObject Pieza(PrimitiveType tipo, string nombre, Vector3 pos, Vector3 escala, Color color, Transform padre = null)
     {
         GameObject go = GameObject.CreatePrimitive(tipo);
         go.name = nombre;
@@ -119,130 +238,208 @@ public class Ciudad3D : MonoBehaviour
         go.transform.localPosition = pos;
         go.transform.localScale = escala;
         go.GetComponent<Renderer>().sharedMaterial = Mat(color);
-        if (!conColisor) Destroy(go.GetComponent<Collider>());
+        Destroy(go.GetComponent<Collider>());
         return go;
     }
 
-    private void Arbol(Vector3 pos)
+    /// <summary>Instancia un modelo de Resources, lo escala para que mida "ancho" y lo apoya en el suelo.</summary>
+    private GameObject Modelo(string ruta, Transform padre, Vector3 pos, float ancho, float giroY)
     {
-        Pieza(PrimitiveType.Cylinder, "Tronco", pos + new Vector3(0, 0.8f, 0), new Vector3(0.35f, 0.8f, 0.35f), Paleta.Hex("8B6A4E"), false);
-        Pieza(PrimitiveType.Sphere, "Copa", pos + new Vector3(0, 2.3f, 0), new Vector3(2f, 1.8f, 2f), Paleta.Hex("8CC084"), false);
+        GameObject prefab = Resources.Load<GameObject>(ruta);
+        if (prefab == null) { Debug.LogWarning("[Ciudad] No encuentro el modelo " + ruta); return null; }
+        GameObject go = Instantiate(prefab, padre, false);
+        go.name = prefab.name;
+        foreach (Collider c in go.GetComponentsInChildren<Collider>()) Destroy(c);
+        go.transform.localRotation = Quaternion.Euler(0, giroY, 0);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localScale = Vector3.one;
+        Bounds b = Limites(go);
+        float tam = Mathf.Max(b.size.x, b.size.z);
+        float escala = tam > 0.001f ? ancho / tam : 1f;
+        go.transform.localScale = Vector3.one * escala;
+        b = Limites(go);
+        Vector3 centroLocal = padre != null ? padre.InverseTransformPoint(b.center) : b.center;
+        float baseY = padre != null ? padre.InverseTransformPoint(new Vector3(0, b.min.y, 0)).y : b.min.y;
+        go.transform.localPosition = pos - new Vector3(centroLocal.x, baseY, centroLocal.z);
+        foreach (Renderer r in go.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.On;
+        return go;
     }
 
-    private void CrearEdificio(int i)
+    private static Bounds Limites(GameObject go)
     {
-        var e = new Edificio();
-        e.centro = Solares[i];
-        e.ancho = 6f + (i % 3);
-        e.fondo = 6f;
-        e.alto = 4f + (i * 37 % 5);
-
-        var raiz = new GameObject("Edificio " + i);
-        raiz.transform.SetParent(transform, false);
-        raiz.AddComponent<Lote>().indice = i;
-
-        Vector3 c = e.centro + new Vector3(0, 0, 0.5f);
-        GameObject fachada = Pieza(PrimitiveType.Cube, "Fachada", c + new Vector3(0, e.alto / 2f, 0), new Vector3(e.ancho, e.alto, e.fondo),
-            Paleta.Hex(Fachadas[i]), true, raiz.transform);
-        e.fachada = fachada.GetComponent<Renderer>();
-        Pieza(PrimitiveType.Cube, "Tejado", c + new Vector3(0, e.alto + 0.3f, 0), new Vector3(e.ancho + 0.5f, 0.6f, e.fondo + 0.5f),
-            Paleta.Hex("C9785B"), true, raiz.transform);
-        Pieza(PrimitiveType.Cube, "Puerta", c + new Vector3(0, 1f, -e.fondo / 2f - 0.05f), new Vector3(1.3f, 2f, 0.12f),
-            Paleta.Hex("8B5A3C"), false, raiz.transform);
-        for (int v = -1; v <= 1; v += 2)
-            Pieza(PrimitiveType.Cube, "Ventana", c + new Vector3(v * e.ancho * 0.28f, e.alto * 0.62f, -e.fondo / 2f - 0.05f),
-                new Vector3(1.2f, 1.1f, 0.1f), Paleta.Hex("BFD8E6"), false, raiz.transform);
-
-        GameObject pin = Pieza(PrimitiveType.Sphere, "Pin", e.centro + new Vector3(0, e.alto + 2.6f, 0), Vector3.one * 1.5f,
-            Paleta.Gris, false, raiz.transform);
-        e.pin = pin.GetComponent<Renderer>();
-
-        e.cartel = Cartel(raiz.transform, e.centro + new Vector3(0, e.alto + 4.3f, 0), out e.letrero, 70);
-        Text t;
-        e.interrogacion = Cartel(raiz.transform, e.centro + new Vector3(0, e.alto + 2.6f, 0), out t, 120);
-        t.text = "?";
-        edificios.Add(e);
+        Renderer[] rs = go.GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return new Bounds(go.transform.position, Vector3.zero);
+        Bounds b = rs[0].bounds;
+        foreach (Renderer r in rs) b.Encapsulate(r.bounds);
+        return b;
     }
 
-    private GameObject Cartel(Transform padre, Vector3 pos, out Text texto, int tam)
+    // ---------------------------------------------------------------- solares
+
+    public void ActualizarTodos()
     {
-        var go = new GameObject("Cartel", typeof(RectTransform), typeof(Canvas));
-        go.transform.SetParent(padre, false);
-        go.transform.position = pos;
+        for (int i = 0; i < solares.Count; i++) ActualizarEdificio(i);
+    }
+
+    public void ActualizarEdificio(int i)
+    {
+        Solar s = solares[i];
+        string rolId = datos.roles[i];
+        RolEdificio rol = Catalogos.BuscarRol(rolId);
+        if (s.rolMostrado != rolId)
+        {
+            if (s.modelo != null) Destroy(s.modelo);
+            s.modelo = new GameObject("Edificio");
+            s.modelo.transform.SetParent(s.raiz, false);
+            ConstruirModelo(s, rolId, i);
+            s.rolMostrado = rolId;
+            Bounds b = Limites(s.modelo);
+            s.alto = Mathf.Max(3f, b.max.y);
+        }
+
+        s.medallon.transform.localPosition = s.centro + new Vector3(0, s.alto + 2.4f, 0);
+        if (rol != null)
+        {
+            s.fondoMedallon.color = Paleta.DeArea(rol.area);
+            s.letraMedallon.text = rol.nombre.Substring(0, 1);
+            s.etiqueta.text = rol.nombre;
+            s.pastilla.SetActive(true);
+        }
+        else
+        {
+            s.fondoMedallon.color = Paleta.Hex("B8AFA3");
+            s.letraMedallon.text = "?";
+            s.pastilla.SetActive(false);
+        }
+    }
+
+    private void ConstruirModelo(Solar s, string rol, int indice)
+    {
+        Transform p = s.modelo.transform;
+        Vector3 c = s.centro + new Vector3(0, 0, 0.8f);
+        switch (rol)
+        {
+            case "casa": Modelo("Ciudad/Suburban/building-type-a", p, c, AnchoSolar, 180f); Valla(p, c); break;
+            case "amigos": Modelo("Ciudad/Suburban/building-type-k", p, c, AnchoSolar, 180f); Valla(p, c); break;
+            case "gimnasio": Modelo("Ciudad/Comercial/building-c", p, c, AnchoSolar, 180f); break;
+            case "cafeteria":
+                Modelo("Ciudad/Comercial/building-a", p, c, AnchoSolar, 180f);
+                Modelo("Ciudad/Comercial/detail-parasol-a", p, c + new Vector3(-2.6f, 0, -4.2f), 1.8f, 0f);
+                Modelo("Ciudad/Comercial/detail-parasol-b", p, c + new Vector3(2.6f, 0, -4.2f), 1.8f, 0f);
+                break;
+            case "biblioteca": Modelo("Ciudad/Comercial/building-e", p, c, AnchoSolar, 180f); break;
+            case "trabajo": Modelo("Ciudad/Comercial/building-skyscraper-a", p, c, AnchoSolar * 0.85f, 180f); break;
+            case "recreativos": Modelo("Ciudad/Comercial/building-h", p, c, AnchoSolar, 180f); break;
+            case "parque":
+                Pieza(PrimitiveType.Cube, "Césped parque", s.centro + new Vector3(0, 0.03f, 0), new Vector3(9.5f, 0.06f, 9.5f), Paleta.Hex("93C47D"), p);
+                Modelo("Ciudad/Suburban/tree-large", p, s.centro + new Vector3(-2.5f, 0, 2f), 3.6f, 0f);
+                Modelo("Ciudad/Suburban/tree-large", p, s.centro + new Vector3(2.8f, 0, 1.2f), 3.2f, 40f);
+                Modelo("Ciudad/Suburban/tree-small", p, s.centro + new Vector3(0.5f, 0, 3.4f), 2.4f, 0f);
+                Modelo("Ciudad/Suburban/path-stones-long", p, s.centro + new Vector3(0, 0.05f, -1.5f), 2.2f, 90f);
+                Modelo("Ciudad/Suburban/planter", p, s.centro + new Vector3(-3f, 0, -3f), 1.5f, 0f);
+                break;
+            default:
+                // Sin papel: casa sencilla y algo apagada, con el "?" encima
+                Modelo("Ciudad/Suburban/building-type-" + "fgjnpqrstu"[indice % 10], p, c, AnchoSolar * 0.9f, 180f);
+                break;
+        }
+    }
+
+    private void Valla(Transform p, Vector3 c)
+    {
+        Modelo("Ciudad/Suburban/fence-low", p, c + new Vector3(-3.3f, 0, -4.6f), 2.6f, 0f);
+        Modelo("Ciudad/Suburban/fence-low", p, c + new Vector3(3.3f, 0, -4.6f), 2.6f, 0f);
+    }
+
+    private void CrearMedallon(Solar s)
+    {
+        var go = new GameObject("Medallón", typeof(RectTransform), typeof(Canvas));
+        go.transform.SetParent(s.raiz, false);
         go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
         var rt = (RectTransform)go.transform;
-        rt.sizeDelta = new Vector2(480, 150);
-        rt.localScale = Vector3.one * 0.012f;
-        Image fondo = UIFabrica.Caja(go.transform, "Fondo", Paleta.Tarjeta);
-        UIFabrica.Anclar(fondo.rectTransform, 0, 0, 1, 1);
-        texto = UIFabrica.Texto(go.transform, "", tam, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        UIFabrica.Anclar(texto.rectTransform, 0, 0, 1, 1);
+        rt.sizeDelta = new Vector2(300, 320);
+        rt.localScale = Vector3.one * 0.0085f;
+
+        Image borde = UIFabrica.Caja(go.transform, "Borde", Paleta.Blanco);
+        borde.sprite = UIFabrica.Circulo; borde.type = Image.Type.Simple;
+        borde.rectTransform.anchorMin = borde.rectTransform.anchorMax = new Vector2(0.5f, 0.62f);
+        borde.rectTransform.sizeDelta = new Vector2(200, 200);
+        UIFabrica.Sombra(borde, 8f, 0.25f);
+        s.fondoMedallon = UIFabrica.Caja(borde.transform, "Color", Paleta.Gris);
+        s.fondoMedallon.sprite = UIFabrica.Circulo; s.fondoMedallon.type = Image.Type.Simple;
+        UIFabrica.Anclar(s.fondoMedallon.rectTransform, 0.09f, 0.09f, 0.91f, 0.91f);
+        s.letraMedallon = UIFabrica.Texto(s.fondoMedallon.transform, "?", 110, Paleta.Blanco, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(s.letraMedallon.rectTransform, 0, 0, 1, 1);
+
+        Image pastilla = UIFabrica.Caja(go.transform, "Pastilla", Paleta.Tarjeta);
+        pastilla.rectTransform.anchorMin = pastilla.rectTransform.anchorMax = new Vector2(0.5f, 0.08f);
+        pastilla.rectTransform.sizeDelta = new Vector2(300, 70);
+        UIFabrica.Sombra(pastilla, 5f, 0.2f);
+        s.etiqueta = UIFabrica.Texto(pastilla.transform, "", 44, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(s.etiqueta.rectTransform, 0, 0, 1, 1);
+        s.pastilla = pastilla.gameObject;
+        s.medallon = go;
         carteles.Add(go.transform);
-        return go;
     }
+
+    // ---------------------------------------------------------------- avatar
 
     private void CrearAvatar()
     {
         avatar = new GameObject("Avatar").transform;
         avatar.SetParent(transform, false);
-        var cuerpo = new GameObject("Cuerpo").transform;
+        cuerpo = new GameObject("Cuerpo").transform;
         cuerpo.SetParent(avatar, false);
-        cuerpo.localScale = Vector3.one * 1.25f; // grande y legible (decisión de diseño)
-        Pieza(PrimitiveType.Cylinder, "Pierna", new Vector3(-0.22f, 0.4f, 0), new Vector3(0.3f, 0.4f, 0.3f), Paleta.Vaquero, false, cuerpo);
-        Pieza(PrimitiveType.Cylinder, "Pierna", new Vector3(0.22f, 0.4f, 0), new Vector3(0.3f, 0.4f, 0.3f), Paleta.Vaquero, false, cuerpo);
-        GameObject torso = Pieza(PrimitiveType.Capsule, "Sudadera", new Vector3(0, 1.3f, 0), new Vector3(0.95f, 0.6f, 0.8f), Paleta.Hex("2FA3A0"), false, cuerpo);
-        sudadera = torso.GetComponent<Renderer>();
-        sudadera.material = new Material(Mat(Paleta.Hex("2FA3A0")));
-        Pieza(PrimitiveType.Cube, "Mochila", new Vector3(0, 1.35f, -0.48f), new Vector3(0.75f, 0.85f, 0.35f), Paleta.Mochila, false, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Cabeza", new Vector3(0, 2.35f, 0), Vector3.one * 0.85f, Paleta.Piel, false, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Pelo", new Vector3(0, 2.6f, -0.05f), new Vector3(0.9f, 0.5f, 0.9f), Paleta.Pelo, false, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Ojo", new Vector3(-0.17f, 2.4f, 0.38f), Vector3.one * 0.13f, Paleta.Texto, false, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Ojo", new Vector3(0.17f, 2.4f, 0.38f), Vector3.one * 0.13f, Paleta.Texto, false, cuerpo);
-        Pieza(PrimitiveType.Cylinder, "Anillo", new Vector3(0, 0.02f, 0), new Vector3(2.4f, 0.01f, 2.4f), Paleta.Blanco, false, avatar);
-        avatar.rotation = Quaternion.Euler(0, 180, 0); // mirando a la cámara
+        cuerpo.localScale = Vector3.one * 1.45f; // grande y legible (decisión de diseño)
+
+        Color sud = Paleta.Hex("2FA3A0");
+        piernaI = Articulacion("Pierna I", new Vector3(-0.2f, 0.75f, 0));
+        piernaD = Articulacion("Pierna D", new Vector3(0.2f, 0.75f, 0));
+        Pieza(PrimitiveType.Capsule, "Pierna", new Vector3(0, -0.38f, 0), new Vector3(0.3f, 0.38f, 0.3f), Paleta.Vaquero, piernaI);
+        Pieza(PrimitiveType.Capsule, "Pierna", new Vector3(0, -0.38f, 0), new Vector3(0.3f, 0.38f, 0.3f), Paleta.Vaquero, piernaD);
+        Pieza(PrimitiveType.Cube, "Zapatilla", new Vector3(0, -0.72f, 0.06f), new Vector3(0.28f, 0.14f, 0.42f), Paleta.Blanco, piernaI);
+        Pieza(PrimitiveType.Cube, "Zapatilla", new Vector3(0, -0.72f, 0.06f), new Vector3(0.28f, 0.14f, 0.42f), Paleta.Blanco, piernaD);
+
+        var torso = Pieza(PrimitiveType.Capsule, "Sudadera", new Vector3(0, 1.2f, 0), new Vector3(0.82f, 0.5f, 0.62f), sud, cuerpo);
+        var capucha = Pieza(PrimitiveType.Sphere, "Capucha", new Vector3(0, 1.62f, -0.2f), new Vector3(0.62f, 0.3f, 0.42f), sud, cuerpo);
+        brazoI = Articulacion("Brazo I", new Vector3(-0.47f, 1.52f, 0));
+        brazoD = Articulacion("Brazo D", new Vector3(0.47f, 1.52f, 0));
+        var mangaI = Pieza(PrimitiveType.Capsule, "Manga", new Vector3(0, -0.32f, 0), new Vector3(0.24f, 0.34f, 0.24f), sud, brazoI);
+        var mangaD = Pieza(PrimitiveType.Capsule, "Manga", new Vector3(0, -0.32f, 0), new Vector3(0.24f, 0.34f, 0.24f), sud, brazoD);
+        Pieza(PrimitiveType.Sphere, "Mano", new Vector3(0, -0.68f, 0), Vector3.one * 0.2f, Paleta.Piel, brazoI);
+        Pieza(PrimitiveType.Sphere, "Mano", new Vector3(0, -0.68f, 0), Vector3.one * 0.2f, Paleta.Piel, brazoD);
+        sudadera = new[] { torso.GetComponent<Renderer>(), capucha.GetComponent<Renderer>(), mangaI.GetComponent<Renderer>(), mangaD.GetComponent<Renderer>() };
+        foreach (Renderer r in sudadera) r.material = new Material(Mat(sud));
+
+        Pieza(PrimitiveType.Cube, "Mochila", new Vector3(0, 1.25f, -0.42f), new Vector3(0.66f, 0.72f, 0.3f), Paleta.Mochila, cuerpo);
+        Pieza(PrimitiveType.Cube, "Bolsillo", new Vector3(0, 1.1f, -0.58f), new Vector3(0.46f, 0.3f, 0.06f), Paleta.Hex("5C616B"), cuerpo);
+        Pieza(PrimitiveType.Sphere, "Cabeza", new Vector3(0, 2.1f, 0), new Vector3(0.95f, 0.92f, 0.9f), Paleta.Piel, cuerpo);
+        Pieza(PrimitiveType.Sphere, "Pelo", new Vector3(0, 2.34f, -0.06f), new Vector3(1f, 0.62f, 0.98f), Paleta.Pelo, cuerpo);
+        Pieza(PrimitiveType.Sphere, "Flequillo", new Vector3(0.12f, 2.42f, 0.32f), new Vector3(0.62f, 0.22f, 0.32f), Paleta.Pelo, cuerpo);
+        Pieza(PrimitiveType.Sphere, "Ojo", new Vector3(-0.17f, 2.1f, 0.42f), new Vector3(0.12f, 0.16f, 0.06f), Paleta.Texto, cuerpo);
+        Pieza(PrimitiveType.Sphere, "Ojo", new Vector3(0.17f, 2.1f, 0.42f), new Vector3(0.12f, 0.16f, 0.06f), Paleta.Texto, cuerpo);
+        Pieza(PrimitiveType.Sphere, "Mejilla", new Vector3(-0.3f, 1.98f, 0.36f), new Vector3(0.14f, 0.08f, 0.04f), Paleta.Hex("F2A08C"), cuerpo);
+        Pieza(PrimitiveType.Sphere, "Mejilla", new Vector3(0.3f, 1.98f, 0.36f), new Vector3(0.14f, 0.08f, 0.04f), Paleta.Hex("F2A08C"), cuerpo);
+        Pieza(PrimitiveType.Cylinder, "Anillo", new Vector3(0, 0.02f, 0), new Vector3(2.6f, 0.008f, 2.6f), Paleta.Hex("FFFDF8"), avatar);
+        avatar.rotation = Quaternion.Euler(0, 180, 0);
     }
 
-    // ---------------------------------------------------------------- estado
-
-    public void ActualizarTodos()
+    private Transform Articulacion(string nombre, Vector3 pos)
     {
-        for (int i = 0; i < edificios.Count; i++) ActualizarEdificio(i);
-    }
-
-    public void ActualizarEdificio(int i)
-    {
-        Edificio e = edificios[i];
-        RolEdificio rol = Catalogos.BuscarRol(datos.roles[i]);
-        bool tieneRol = rol != null;
-        e.pin.gameObject.SetActive(tieneRol);
-        e.cartel.SetActive(tieneRol);
-        e.interrogacion.SetActive(!tieneRol);
-        if (tieneRol)
-        {
-            Color colorArea = Paleta.DeArea(rol.area);
-            e.pin.sharedMaterial = Mat(colorArea);
-            e.fachada.sharedMaterial = Mat(Color.Lerp(colorArea, Color.white, 0.6f));
-            e.letrero.text = rol.nombre;
-        }
-        else
-        {
-            e.fachada.sharedMaterial = Mat(Paleta.Hex("E7E1D8"));
-        }
+        var t = new GameObject(nombre).transform;
+        t.SetParent(cuerpo, false);
+        t.localPosition = pos;
+        return t;
     }
 
     public void PonerRopa(string colorHex)
     {
-        if (sudadera != null) sudadera.material.SetColor("_BaseColor", Paleta.Hex(colorHex));
-        if (sudadera != null) sudadera.material.color = Paleta.Hex(colorHex);
+        if (sudadera == null) return;
+        Color c = Paleta.Hex(colorHex);
+        foreach (Renderer r in sudadera) { r.material.SetColor("_BaseColor", c); r.material.color = c; }
     }
 
-    public void PonerEstado(TipoEstadoAvatar estado)
-    {
-        if (avatar == null) return;
-        Transform cuerpo = avatar.Find("Cuerpo");
-        float inclinacion = estado == TipoEstadoAvatar.Cansado ? 10f : estado == TipoEstadoAvatar.Descuidado ? 16f : 0f;
-        cuerpo.localRotation = Quaternion.Euler(inclinacion, 0, 0);
-    }
+    public void PonerEstado(TipoEstadoAvatar estado) { estadoAvatar = estado; }
 
     public int RolesAsignados()
     {
@@ -257,6 +454,7 @@ public class Ciudad3D : MonoBehaviour
     public void IrA(int indice, Action alLlegar)
     {
         StopAllCoroutines();
+        desplazamiento = Vector3.zero;
         StartCoroutine(Caminar(indice, alLlegar));
     }
 
@@ -264,7 +462,7 @@ public class Ciudad3D : MonoBehaviour
     {
         Caminando = true;
         Vector3 inicio = avatar.position;
-        Vector3 destino = edificios[indice].Puerta;
+        Vector3 destino = solares[indice].Puerta;
         float calleInicio = MasCercana(inicio.z);
         float calleDestino = MasCercana(destino.z);
         float calleVertical = MasCercana(inicio.x);
@@ -276,23 +474,20 @@ public class Ciudad3D : MonoBehaviour
             new Vector3(destino.x, 0, calleDestino),
             destino,
         };
-        Transform cuerpo = avatar.Find("Cuerpo");
-        float t = 0f;
         foreach (Vector3 p in puntos)
         {
             while ((avatar.position - p).sqrMagnitude > 0.01f)
             {
                 Vector3 dir = p - avatar.position;
-                avatar.position = Vector3.MoveTowards(avatar.position, p, 8f * Time.deltaTime);
+                avatar.position = Vector3.MoveTowards(avatar.position, p, 7.5f * Time.deltaTime);
                 if (dir.sqrMagnitude > 0.001f)
                     avatar.rotation = Quaternion.Slerp(avatar.rotation, Quaternion.LookRotation(new Vector3(dir.x, 0, dir.z)), 12f * Time.deltaTime);
-                t += Time.deltaTime;
-                cuerpo.localPosition = new Vector3(0, Mathf.Abs(Mathf.Sin(t * 12f)) * 0.15f, 0);
                 yield return null;
             }
         }
-        cuerpo.localPosition = Vector3.zero;
-        avatar.rotation = Quaternion.Euler(0, 180, 0);
+        float t = 0f;
+        Quaternion desde = avatar.rotation, hacia = Quaternion.Euler(0, 180, 0);
+        while (t < 1f) { t += Time.deltaTime * 4f; avatar.rotation = Quaternion.Slerp(desde, hacia, t); yield return null; }
         datos.edificioActual = indice;
         Caminando = false;
         if (alLlegar != null) alLlegar();
@@ -305,32 +500,86 @@ public class Ciudad3D : MonoBehaviour
         return mejor;
     }
 
+    private void Animar()
+    {
+        float t = Time.time;
+        if (Caminando)
+        {
+            float s = Mathf.Sin(t * 11f);
+            piernaI.localRotation = Quaternion.Euler(s * 32f, 0, 0);
+            piernaD.localRotation = Quaternion.Euler(-s * 32f, 0, 0);
+            brazoI.localRotation = Quaternion.Euler(-s * 28f, 0, 6f);
+            brazoD.localRotation = Quaternion.Euler(s * 28f, 0, -6f);
+            cuerpo.localPosition = new Vector3(0, Mathf.Abs(Mathf.Cos(t * 11f)) * 0.12f, 0);
+            cuerpo.localRotation = Quaternion.identity;
+        }
+        else
+        {
+            float respira = Mathf.Sin(t * 2.2f);
+            float inclinacion = estadoAvatar == TipoEstadoAvatar.Cansado ? 9f : estadoAvatar == TipoEstadoAvatar.Descuidado ? 14f : 0f;
+            float brazos = estadoAvatar == TipoEstadoAvatar.EnForma ? 10f : 4f;
+            piernaI.localRotation = piernaD.localRotation = Quaternion.identity;
+            brazoI.localRotation = Quaternion.Euler(0, 0, brazos + respira * 2f);
+            brazoD.localRotation = Quaternion.Euler(0, 0, -brazos - respira * 2f);
+            cuerpo.localPosition = new Vector3(0, respira * 0.02f, 0);
+            cuerpo.localRotation = Quaternion.Euler(inclinacion, 0, 0);
+        }
+    }
+
     // ---------------------------------------------------------------- cámara y toques
 
     private void SituarCamara(bool instantaneo)
     {
         if (camara == null || avatar == null) return;
-        Vector3 objetivo = avatar.position + Vector3.up * 1.5f;
-        Vector3 deseada = objetivo + new Vector3(0, 15f, -15f) * zoom;
-        camara.transform.position = instantaneo ? deseada : Vector3.Lerp(camara.transform.position, deseada, 5f * Time.deltaTime);
-        camara.transform.rotation = Quaternion.LookRotation(objetivo - deseada);
+        Vector3 objetivo = avatar.position + desplazamiento + Vector3.up * 1.6f;
+        Vector3 deseada = objetivo + new Vector3(0, 27f, -21f) * zoom;
+        float k = instantaneo ? 1f : 1f - Mathf.Exp(-6f * Time.deltaTime);
+        camara.transform.position = Vector3.Lerp(camara.transform.position, deseada, k);
+        camara.transform.rotation = Quaternion.Slerp(camara.transform.rotation, Quaternion.LookRotation(objetivo - deseada), k);
     }
 
     private void Update()
     {
+        Animar();
         if (Mouse.current != null)
         {
             float rueda = Mouse.current.scroll.ReadValue().y;
-            if (Mathf.Abs(rueda) > 0.01f) zoom = Mathf.Clamp(zoom - rueda * 0.0015f, 0.6f, 1.7f); // zoom limitado: el avatar siempre se ve
+            if (Mathf.Abs(rueda) > 0.01f) zoom = Mathf.Clamp(zoom - rueda * 0.0012f, 0.55f, 1.45f); // zoom limitado: el avatar siempre se ve
         }
-
-        if (!Activa || Caminando) return;
         Pointer puntero = Pointer.current;
-        if (puntero == null || !puntero.press.wasPressedThisFrame) return;
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-        Ray rayo = camara.ScreenPointToRay(puntero.position.ReadValue());
+        if (!Activa || puntero == null) { pulsado = false; return; }
+
+        Vector2 pos = puntero.position.ReadValue();
+        if (puntero.press.wasPressedThisFrame)
+        {
+            pulsado = !(EventSystem.current != null && EventSystem.current.IsPointerOverGameObject());
+            arrastrando = false;
+            inicioPuntero = pos;
+        }
+        if (pulsado && puntero.press.isPressed)
+        {
+            Vector2 delta = puntero.delta.ReadValue();
+            if ((pos - inicioPuntero).sqrMagnitude > 400f) arrastrando = true;
+            if (arrastrando)
+            {
+                float f = 0.045f * zoom;
+                desplazamiento += new Vector3(-delta.x * f, 0, -delta.y * f);
+                desplazamiento.x = Mathf.Clamp(desplazamiento.x, -24f, 24f);
+                desplazamiento.z = Mathf.Clamp(desplazamiento.z, -24f, 24f);
+            }
+        }
+        if (pulsado && puntero.press.wasReleasedThisFrame)
+        {
+            pulsado = false;
+            if (!arrastrando && !Caminando) Tocar(pos);
+        }
+    }
+
+    private void Tocar(Vector2 pos)
+    {
+        Ray rayo = camara.ScreenPointToRay(pos);
         RaycastHit golpe;
-        if (Physics.Raycast(rayo, out golpe, 400f))
+        if (Physics.Raycast(rayo, out golpe, 500f))
         {
             Lote lote = golpe.collider.GetComponentInParent<Lote>();
             if (lote != null && AlTocarEdificio != null) AlTocarEdificio(lote.indice);
@@ -343,8 +592,10 @@ public class Ciudad3D : MonoBehaviour
         if (camara == null) return;
         foreach (Transform c in carteles) c.rotation = camara.transform.rotation;
         float tiempo = Time.time;
-        foreach (Edificio e in edificios)
-            if (e.pin.gameObject.activeSelf)
-                e.pin.transform.localPosition = e.centro + new Vector3(0, e.alto + 2.6f + Mathf.Sin(tiempo * 2f) * 0.2f, 0);
+        for (int i = 0; i < solares.Count; i++)
+        {
+            Solar s = solares[i];
+            s.medallon.transform.localPosition = s.centro + new Vector3(0, s.alto + 2.4f + Mathf.Sin(tiempo * 2f + i) * 0.18f, 0);
+        }
     }
 }

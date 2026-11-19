@@ -13,6 +13,7 @@ public abstract class Pantalla
     protected readonly RectTransform columna;
     protected readonly RectTransform raizRT;
     private readonly GameObject raiz;
+    private readonly Aparecer aparecer;
 
     /// <param name="pestana">Índice de la pestaña resaltada (0-4), o -1 para no mostrar barra.</param>
     protected Pantalla(Juego juego, Transform canvas, string nombre, int pestana = -1, bool transparente = false)
@@ -23,6 +24,8 @@ public abstract class Pantalla
         UIFabrica.Anclar(fondo.rectTransform, 0, 0, 1, 1);
         raiz = fondo.gameObject;
         raizRT = fondo.rectTransform;
+        raiz.AddComponent<CanvasGroup>();
+        aparecer = raiz.AddComponent<Aparecer>();
         columna = UIFabrica.Columna(fondo.transform, "Columna", 48, 22);
         if (pestana >= 0)
         {
@@ -31,7 +34,7 @@ public abstract class Pantalla
         }
     }
 
-    public void Mostrar() { raiz.SetActive(true); AlMostrar(); }
+    public void Mostrar() { raiz.SetActive(true); aparecer.Lanzar(); AlMostrar(); }
     public void Ocultar() { raiz.SetActive(false); }
     public bool Visible { get { return raiz.activeSelf; } }
     public virtual void Actualizar() { }
@@ -50,6 +53,7 @@ public abstract class Pantalla
     {
         Image fondo = UIFabrica.Caja(padre, "Tarjeta", Paleta.Tarjeta);
         UIFabrica.Anclar(fondo.rectTransform, 0, 0, 1, 1);
+        UIFabrica.Sombra(fondo);
         return fondo;
     }
 

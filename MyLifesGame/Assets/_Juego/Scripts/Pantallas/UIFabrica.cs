@@ -6,12 +6,39 @@ using UnityEngine.UI;
 public static class UIFabrica
 {
     private static Font fuente;
+    private static Font fuenteNegrita;
     private static Sprite redondeado;
     private static Sprite circulo;
 
+    /// <summary>Nunito SemiBold (redondeada, de juego de móvil). Si no está, la fuente por defecto.</summary>
     public static Font Fuente
     {
-        get { if (fuente == null) fuente = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); return fuente; }
+        get
+        {
+            if (fuente == null) fuente = Resources.Load<Font>("Fuentes/Nunito-SemiBold");
+            if (fuente == null) fuente = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            return fuente;
+        }
+    }
+
+    /// <summary>Nunito ExtraBold para títulos y botones.</summary>
+    public static Font FuenteNegrita
+    {
+        get
+        {
+            if (fuenteNegrita == null) fuenteNegrita = Resources.Load<Font>("Fuentes/Nunito-ExtraBold");
+            if (fuenteNegrita == null) fuenteNegrita = Fuente;
+            return fuenteNegrita;
+        }
+    }
+
+    /// <summary>Sombra suave bajo una tarjeta o botón.</summary>
+    public static void Sombra(Graphic g, float distancia = 6f, float opacidad = 0.12f)
+    {
+        var s = g.gameObject.GetComponent<Shadow>();
+        if (s == null) s = g.gameObject.AddComponent<Shadow>();
+        s.effectColor = new Color(0.29f, 0.2f, 0.15f, opacidad);
+        s.effectDistance = new Vector2(0, -distancia);
     }
 
     public static Sprite Redondeado
@@ -97,12 +124,14 @@ public static class UIFabrica
     {
         RectTransform rt = Crear("Texto", padre);
         var t = rt.gameObject.AddComponent<Text>();
-        t.font = Fuente;
+        bool negrita = estilo == FontStyle.Bold || estilo == FontStyle.BoldAndItalic;
+        t.font = negrita ? FuenteNegrita : Fuente;
         t.text = texto;
         t.fontSize = tam;
         t.color = color;
         t.alignment = alineacion;
-        t.fontStyle = estilo;
+        t.fontStyle = negrita ? FontStyle.Normal : estilo;
+        t.lineSpacing = 0.95f;
         t.horizontalOverflow = HorizontalWrapMode.Wrap;
         t.verticalOverflow = VerticalWrapMode.Overflow;
         t.raycastTarget = false;
@@ -114,6 +143,13 @@ public static class UIFabrica
         Image img = Caja(padre, "Botón " + texto, fondo);
         var b = img.gameObject.AddComponent<Button>();
         b.targetGraphic = img;
+        var colores = b.colors;
+        colores.highlightedColor = new Color(1f, 1f, 1f, 1f);
+        colores.pressedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
+        colores.fadeDuration = 0.08f;
+        b.colors = colores;
+        img.gameObject.AddComponent<BotonAnimado>();
+        if (fondo.a > 0.5f) Sombra(img, 5f, 0.14f);
         b.onClick.AddListener(() => alPulsar());
         Text t = Texto(img.transform, texto, tam, colorTexto, TextAnchor.MiddleCenter, FontStyle.Bold);
         Anclar(t.rectTransform, 0.03f, 0f, 0.97f, 1f);

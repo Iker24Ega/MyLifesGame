@@ -105,8 +105,9 @@ public class PantallaCiudad : Pantalla
         else AbrirIr(rol);
     }
 
-    private void LimpiarHoja()
+    private void LimpiarHoja(float alto)
     {
+        hoja.sizeDelta = new Vector2(0, alto);
         for (int i = contenidoHoja.childCount - 1; i >= 0; i--) Object.Destroy(contenidoHoja.GetChild(i).gameObject);
         hoja.gameObject.SetActive(true);
         juego.Ciudad.Activa = false;
@@ -131,7 +132,7 @@ public class PantallaCiudad : Pantalla
 
     private void AbrirConstruir()
     {
-        LimpiarHoja();
+        LimpiarHoja(720);
         Titulo("Modo construir: ¿qué es este edificio?");
         RolEdificio[] roles = Catalogos.Roles;
         for (int f = 0; f < 4; f++)
@@ -164,7 +165,7 @@ public class PantallaCiudad : Pantalla
 
     private void AbrirIr(RolEdificio rol)
     {
-        LimpiarHoja();
+        LimpiarHoja(120 + 96 + 16 + rol.acciones.Length * 112 + 112);
         Titulo(rol.nombre + ": ¿qué vas a hacer aquí?");
         foreach (string id in rol.acciones)
         {

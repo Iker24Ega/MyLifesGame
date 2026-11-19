@@ -1,0 +1,69 @@
+{
+    "_nota": "Tabla de acciones de la Fase 1 (v0.4). Efectos en puntos por hora. Ver docs/fase-1-acciones-y-curvas.md. Trabajar: el límite de 'Demasiado' es por día en el diseño; de momento se aplica por sesión.",
+    "acciones": [
+        {
+            "id": "entrenar", "nombre": "Entrenar", "lugar": "Gimnasio",
+            "zonaMin": 30, "zonaMax": 90, "demasiadoDesde": 120,
+            "esfuerzo": true, "desconexion": false, "mental": false, "ayudaAnimoBajo": false,
+            "socialConAmigosPorHora": 0, "afectaSueno": true,
+            "efectoHora":          { "fisico": 15, "mente": 0, "social": 0, "energia": 4,   "animo": 4 },
+            "efectoHoraDemasiado": { "fisico": 4,  "mente": 0, "social": 0, "energia": -20, "animo": -4 }
+        },
+        {
+            "id": "pasear", "nombre": "Pasear", "lugar": "Parque",
+            "zonaMin": 20, "zonaMax": 90, "demasiadoDesde": 150,
+            "esfuerzo": false, "desconexion": true, "mental": false, "ayudaAnimoBajo": false,
+            "socialConAmigosPorHora": 0, "afectaSueno": false,
+            "efectoHora":          { "fisico": 5, "mente": 0, "social": 0, "energia": 6,  "animo": 3 },
+            "efectoHoraDemasiado": { "fisico": 1, "mente": 0, "social": 0, "energia": -8, "animo": 1 }
+        },
+        {
+            "id": "estudiar", "nombre": "Estudiar", "lugar": "Biblioteca",
+            "zonaMin": 30, "zonaMax": 120, "demasiadoDesde": 180,
+            "esfuerzo": true, "desconexion": false, "mental": true, "ayudaAnimoBajo": false,
+            "socialConAmigosPorHora": 0, "afectaSueno": false,
+            "efectoHora":          { "fisico": 0, "mente": 8, "social": 0, "energia": -5,  "animo": 0 },
+            "efectoHoraDemasiado": { "fisico": 0, "mente": 3, "social": 0, "energia": -10, "animo": -5 }
+        },
+        {
+            "id": "trabajar", "nombre": "Trabajar", "lugar": "Trabajo",
+            "zonaMin": 0, "zonaMax": 480, "demasiadoDesde": 540,
+            "esfuerzo": true, "desconexion": false, "mental": true, "ayudaAnimoBajo": false,
+            "socialConAmigosPorHora": 0, "afectaSueno": false,
+            "efectoHora":          { "fisico": 0, "mente": 4, "social": 0, "energia": -5,  "animo": 0 },
+            "efectoHoraDemasiado": { "fisico": 0, "mente": 1, "social": 0, "energia": -12, "animo": -4 }
+        },
+        {
+            "id": "quedar", "nombre": "Quedar con amigos", "lugar": "Cafetería",
+            "zonaMin": 30, "zonaMax": 240, "demasiadoDesde": 300,
+            "esfuerzo": false, "desconexion": false, "mental": false, "ayudaAnimoBajo": true,
+            "socialConAmigosPorHora": 0, "afectaSueno": false,
+            "efectoHora":          { "fisico": 0, "mente": 0, "social": 20, "energia": -3, "animo": 5 },
+            "efectoHoraDemasiado": { "fisico": 0, "mente": 0, "social": 5,  "energia": -8, "animo": 2 }
+        },
+        {
+            "id": "videojuegos", "nombre": "Videojuegos", "lugar": "Casa",
+            "zonaMin": 30, "zonaMax": 90, "demasiadoDesde": 120,
+            "esfuerzo": false, "desconexion": false, "mental": false, "ayudaAnimoBajo": false,
+            "socialConAmigosPorHora": 6, "afectaSueno": true,
+            "efectoHora":          { "fisico": 0,  "mente": 0,  "social": 0, "energia": -2, "animo": 5 },
+            "efectoHoraDemasiado": { "fisico": -3, "mente": -3, "social": 0, "energia": -8, "animo": 1 }
+        },
+        {
+            "id": "descansar", "nombre": "Descansar", "lugar": "Casa",
+            "zonaMin": 15, "zonaMax": 45, "demasiadoDesde": 90,
+            "esfuerzo": false, "desconexion": true, "mental": false, "ayudaAnimoBajo": false,
+            "socialConAmigosPorHora": 0, "afectaSueno": false,
+            "efectoHora":          { "fisico": 0, "mente": 0, "social": 0, "energia": 25, "animo": 2 },
+            "efectoHoraDemasiado": { "fisico": 0, "mente": 0, "social": 0, "energia": 5,  "animo": -4 }
+        },
+        {
+            "id": "meditar", "nombre": "Meditar", "lugar": "Casa",
+            "zonaMin": 5, "zonaMax": 30, "demasiadoDesde": 60,
+            "esfuerzo": false, "desconexion": true, "mental": false, "ayudaAnimoBajo": true,
+            "socialConAmigosPorHora": 0, "afectaSueno": false,
+            "efectoHora":          { "fisico": 0, "mente": 10, "social": 0, "energia": 5, "animo": 12 },
+            "efectoHoraDemasiado": { "fisico": 0, "mente": 0,  "social": 0, "energia": 5, "animo": 0 }
+        }
+    ]
+}

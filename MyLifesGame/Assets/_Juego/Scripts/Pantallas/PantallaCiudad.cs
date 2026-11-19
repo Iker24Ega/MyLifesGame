@@ -37,21 +37,33 @@ public class PantallaCiudad : Pantalla
         monedas = UIFabrica.Texto(cab.transform, "", 34, Paleta.Texto, TextAnchor.MiddleRight, FontStyle.Bold);
         UIFabrica.Anclar(monedas.rectTransform, 0.7f, 0, 0.96f, 1);
 
-        // Las cinco áreas (tocar abre "Tu equilibrio")
-        RectTransform filaAreas = UIFabrica.Fila(columna, "Áreas", 86);
+        // Las cinco áreas como medidores redondos (tocar abre "Tu equilibrio")
+        RectTransform filaAreas = UIFabrica.Fila(columna, "Áreas", 130);
         Button areas = UIFabrica.Boton(filaAreas, "", Paleta.Tarjeta, Paleta.Texto, 10, () => this.juego.IrAEquilibrio());
-        UIFabrica.Anclar((RectTransform)areas.transform, 0, 0, 1, 1);
+        UIFabrica.Anclar((RectTransform)areas.transform, 0.08f, 0, 0.92f, 1);
         foreach (Area area in Areas.Todas)
         {
             int i = (int)area;
-            float x0 = i / 5f + 0.015f, x1 = (i + 1) / 5f - 0.015f;
-            Text n = UIFabrica.Texto(areas.transform, Areas.Nombre(area), 22, Paleta.DeArea(area), TextAnchor.MiddleCenter, FontStyle.Bold);
-            UIFabrica.Anclar(n.rectTransform, x0, 0.5f, x1, 0.95f);
-            Image fondo = UIFabrica.Caja(areas.transform, "Fondo " + i, Paleta.Gris);
-            UIFabrica.Anclar(fondo.rectTransform, x0, 0.15f, x1, 0.42f);
-            rellenos[i] = UIFabrica.Caja(fondo.transform, "Relleno", Paleta.DeArea(area));
-            rellenos[i].type = Image.Type.Filled; rellenos[i].fillMethod = Image.FillMethod.Horizontal; rellenos[i].sprite = UIFabrica.Plano;
+            RectTransform hueco = UIFabrica.Crear("Medidor " + i, areas.transform);
+            hueco.anchorMin = hueco.anchorMax = new Vector2((i + 0.5f) / 5f, 0.58f);
+            hueco.sizeDelta = new Vector2(92, 92);
+            Image fondoAnillo = UIFabrica.Caja(hueco, "Fondo", Paleta.Gris);
+            fondoAnillo.sprite = UIFabrica.Circulo; fondoAnillo.type = Image.Type.Simple;
+            UIFabrica.Anclar(fondoAnillo.rectTransform, 0, 0, 1, 1);
+            rellenos[i] = UIFabrica.Caja(hueco, "Anillo", Paleta.DeArea(area));
+            rellenos[i].sprite = UIFabrica.Circulo;
+            rellenos[i].type = Image.Type.Filled;
+            rellenos[i].fillMethod = Image.FillMethod.Radial360;
+            rellenos[i].fillOrigin = (int)Image.Origin360.Top;
             UIFabrica.Anclar(rellenos[i].rectTransform, 0, 0, 1, 1);
+            Image separador = UIFabrica.Caja(hueco, "Separador", Paleta.Tarjeta);
+            separador.sprite = UIFabrica.Circulo; separador.type = Image.Type.Simple;
+            UIFabrica.Anclar(separador.rectTransform, 0.1f, 0.1f, 0.9f, 0.9f);
+            FormasUI icono = Iconos.Crear(hueco, area, 66f);
+            icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            Text n = UIFabrica.Texto(areas.transform, Areas.Nombre(area), 20, Paleta.TextoSuave, TextAnchor.MiddleCenter, FontStyle.Bold);
+            n.rectTransform.anchorMin = n.rectTransform.anchorMax = new Vector2((i + 0.5f) / 5f, 0.12f);
+            n.rectTransform.sizeDelta = new Vector2(120, 30);
         }
 
         RectTransform filaAyuda = UIFabrica.Fila(columna, "Ayuda", 56);

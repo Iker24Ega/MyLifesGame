@@ -30,13 +30,11 @@ public class PantallaResultado : Pantalla
         {
             int i = (int)area;
             RectTransform fila = UIFabrica.Fila(col, Areas.Nombre(area), 78);
-            Image punto = UIFabrica.Caja(fila, "Punto", Paleta.DeArea(area));
-            punto.sprite = UIFabrica.Circulo; punto.type = Image.Type.Simple;
-            punto.rectTransform.anchorMin = punto.rectTransform.anchorMax = new Vector2(0, 0.5f);
-            punto.rectTransform.sizeDelta = new Vector2(32, 32);
-            punto.rectTransform.anchoredPosition = new Vector2(20, 0);
+            FormasUI ic = Iconos.Crear(fila, area, 62f);
+            ic.rectTransform.anchorMin = ic.rectTransform.anchorMax = new Vector2(0, 0.5f);
+            ic.rectTransform.anchoredPosition = new Vector2(34, 0);
             Text n = UIFabrica.Texto(fila, Areas.Nombre(area), 38, Paleta.Texto);
-            UIFabrica.Anclar(n.rectTransform, 0.08f, 0, 0.45f, 1);
+            UIFabrica.Anclar(n.rectTransform, 0.12f, 0, 0.45f, 1);
             cambios[i] = UIFabrica.Texto(fila, "", 44, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFabrica.Anclar(cambios[i].rectTransform, 0.45f, 0, 0.7f, 1);
             nuevos[i] = UIFabrica.Texto(fila, "", 32, Paleta.TextoSuave, TextAnchor.MiddleRight);

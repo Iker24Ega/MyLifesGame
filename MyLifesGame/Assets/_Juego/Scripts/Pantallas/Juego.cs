@@ -13,6 +13,9 @@ using UnityEngine.UI;
 /// </summary>
 public class Juego : MonoBehaviour
 {
+    /// <summary>Modo de capturas automáticas: partida en memoria, sin guardar.</summary>
+    public static bool ModoCapturas;
+
     public TablaAcciones Tabla { get; private set; }
     public DatosPartida Datos { get; private set; }
     public Jornada Jornada { get; private set; }
@@ -65,9 +68,10 @@ public class Juego : MonoBehaviour
         if (FindAnyObjectByType<EventSystem>() == null)
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
-        DatosPartida cargada = Guardado.Cargar();
+        DatosPartida cargada = ModoCapturas ? null : Guardado.Cargar();
         if (cargada != null) Inicializar(cargada, true);
         else Inicializar(PartidaNueva(), false);
+        if (ModoCapturas) gameObject.AddComponent<CapturadorPantallas>();
     }
 
     private DatosPartida PartidaNueva()
@@ -222,7 +226,7 @@ public class Juego : MonoBehaviour
 
     public void GuardarAhora()
     {
-        if (Datos == null) return;
+        if (Datos == null || ModoCapturas) return;
         Datos.minutoJuego = MinutoJuego;
         Datos.velocidad = Velocidad;
         Datos.conAmigos = ConAmigos;
@@ -268,6 +272,9 @@ public class Juego : MonoBehaviour
     }
 
     public void IrAHacer() { Mostrar(pHacer); }
+
+    /// <summary>Para las capturas automáticas: simula tocar un edificio de la ciudad.</summary>
+    public void CapturaTocarEdificio(int indice) { Mostrar(pCiudad); pCiudad.AlTocarEdificio(indice); }
     public void IrAEquilibrio() { Mostrar(pEquilibrio); }
 
     public void Volver()

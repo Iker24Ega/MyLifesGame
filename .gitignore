@@ -4,3 +4,10 @@ Desktop.ini
 .DS_Store
 .vscode/
 .vs/
+
+# Automatización de Claude (capturas y estado)
+/MyLifesGame/Automatizacion/capturas/
+/MyLifesGame/Automatizacion/*.txt
+
+# Descargas de arte sin procesar (se importan a Assets/_Juego/Arte)
+/_descargas/

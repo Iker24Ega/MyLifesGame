@@ -203,9 +203,23 @@ namespace MyLifesGame.Motor
             }
             if (Estado[Area.Energia] > tope) Estado[Area.Energia] = tope;
 
-            Registrar(minutoAcostarse, minutoAcostarse + (int)(horas * 60), "Dormir " + horas.ToString("0.#", CultureInfo.InvariantCulture) + " h",
+            int despertar = minutoAcostarse + (int)(horas * 60);
+            Registrar(minutoAcostarse, despertar, "Dormir " + horas.ToString("0.#", CultureInfo.InvariantCulture) + " h",
                 string.Join("; ", notas));
+
+            // Durante el sueño no hay desgaste. Al despertar empieza un día nuevo.
+            MinutoActual = despertar;
+            proximaRevision = despertar + Ajustes.MinutosEntreRevisiones;
+            bloquesMentales.Clear();
+            minutosMentalesHoy = 0;
+            vasosAgua = 0;
+            comidasBuenas = 0;
+            duchaHecha = false;
         }
+
+        public int VasosAgua { get { return vasosAgua; } }
+        public int ComidasBuenas { get { return comidasBuenas; } }
+        public bool DuchaHecha { get { return duchaHecha; } }
 
         /// <summary>Añade una línea al registro con el estado actual (por ejemplo, tras acciones rápidas).</summary>
         public void Anotar(string texto, string nota = "")

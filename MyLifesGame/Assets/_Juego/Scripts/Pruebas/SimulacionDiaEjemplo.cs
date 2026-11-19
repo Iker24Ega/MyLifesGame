@@ -8,9 +8,13 @@ using UnityEngine;
 /// </summary>
 public static class SimulacionDiaEjemplo
 {
+    // Ponlo a true para volver a ver la simulación en la consola al pulsar Play.
+    private static readonly bool Activa = false;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AlPulsarPlay()
     {
+        if (!Activa) return;
         TextAsset json = Resources.Load<TextAsset>("acciones");
         if (json == null)
         {

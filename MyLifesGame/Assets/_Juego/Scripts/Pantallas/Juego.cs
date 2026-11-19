@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
 using MyLifesGame.Motor;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -5,33 +8,48 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 /// <summary>
-/// Arranca el prototipo al pulsar Play (sin montar nada en la escena): crea la interfaz,
-/// lleva el reloj del juego y conecta las pantallas con el motor del equilibrio.
+/// Arranca la demo al pulsar Play (sin montar nada en la escena): carga o crea la partida, construye la
+/// ciudad 3D y la interfaz, lleva el reloj del juego, guarda en disco y conecta las pantallas con el motor.
 /// </summary>
 public class Juego : MonoBehaviour
 {
     public TablaAcciones Tabla { get; private set; }
+    public DatosPartida Datos { get; private set; }
     public Jornada Jornada { get; private set; }
+    public Progreso Progreso { get; private set; }
+    public Ciudad3D Ciudad { get; private set; }
 
-    /// <summary>Minuto del juego desde el día 1 a las 00:00 (empieza a las 08:00).</summary>
+    /// <summary>Minuto del juego desde el día 1 a las 00:00.</summary>
     public float MinutoJuego;
-
     /// <summary>Minutos de juego por segundo real (1/60 = tiempo real).</summary>
     public float Velocidad = 1f;
-
     public bool ConAmigos;
     public DefinicionAccion AccionEnCurso { get; private set; }
     public float InicioAccion { get; private set; }
+    public bool VieneDeAusencia { get; private set; }
+    public int MinutosAusencia { get; private set; }
 
     public int MinutoEntero { get { return Mathf.FloorToInt(MinutoJuego); } }
     public int Dia { get { return MinutoEntero / 1440 + 1; } }
     public int MinutosAccion { get { return AccionEnCurso == null ? 0 : Mathf.FloorToInt(MinutoJuego - InicioAccion); } }
 
-    private PantallaPrincipal principal;
-    private PantallaHacer hacer;
-    private PantallaCronometro cronometro;
-    private PantallaResultado resultado;
-    private Pantalla actual;
+    private GameObject canvasGO;
+    private PantallaCiudad pCiudad;
+    private PantallaHoy pHoy;
+    private PantallaEquilibrio pEquilibrio;
+    private PantallaHacer pHacer;
+    private PantallaCronometro pCronometro;
+    private PantallaResultado pResultado;
+    private PantallaCheckIn pCheckIn;
+    private PantallaRegreso pRegreso;
+    private PantallaAvatar pAvatar;
+    private PantallaAlbum pAlbum;
+    private Pantalla actual, anterior;
+
+    private Text aviso;
+    private float finAviso;
+    private float proximoGuardado;
+    private int diaPreguntas = -1, preguntasHoy;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Arrancar()
@@ -44,54 +62,221 @@ public class Juego : MonoBehaviour
     {
         TextAsset json = Resources.Load<TextAsset>("acciones");
         Tabla = JsonUtility.FromJson<TablaAcciones>(json.text);
+        if (FindAnyObjectByType<EventSystem>() == null)
+            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
-        // Valores iniciales provisionales (el onboarding se diseñará al final).
-        MinutoJuego = 8 * 60;
-        Jornada = new Jornada(Tabla, new EstadoAreas(50, 50, 50, 75, 50), MinutoEntero);
+        DatosPartida cargada = Guardado.Cargar();
+        if (cargada != null) Inicializar(cargada, true);
+        else Inicializar(PartidaNueva(), false);
+    }
 
+    private DatosPartida PartidaNueva()
+    {
+        var d = new DatosPartida();
+        Jornada j = Jornada.Nueva(Tabla, new float[] { 50, 50, 50, 75, 50 }, 8 * 60);
+        d.jornada = j.Datos;
+        d.minutoJuego = 8 * 60;
+        d.velocidad = 1f;
+        return d;
+    }
+
+    private void Inicializar(DatosPartida d, bool cargada)
+    {
+        Datos = d;
+        Jornada = new Jornada(Tabla, d.jornada);
+        Progreso = new Progreso(d.progreso);
+        MinutoJuego = Mathf.Max(d.minutoJuego, d.jornada.minutoActual);
+        Velocidad = d.velocidad > 0 ? d.velocidad : 1f;
+        ConAmigos = d.conAmigos;
+        AccionEnCurso = null;
+        VieneDeAusencia = false;
+        Jornada.AlRegistrar += EscribirDiario;
+
+        // Ciudad 3D
+        var goCiudad = new GameObject("Ciudad");
+        Ciudad = goCiudad.AddComponent<Ciudad3D>();
+        Ciudad.Construir(this, d.ciudad);
+        Ciudad.PonerRopa(Catalogos.BuscarPrenda(Progreso.Datos.ropaPuesta).colorHex);
+
+        // Interfaz
         Transform canvas = CrearCanvas();
-        principal = new PantallaPrincipal(this, canvas);
-        hacer = new PantallaHacer(this, canvas);
-        cronometro = new PantallaCronometro(this, canvas);
-        resultado = new PantallaResultado(this, canvas);
-        hacer.Ocultar();
-        cronometro.Ocultar();
-        resultado.Ocultar();
-        Mostrar(principal);
+        pCiudad = new PantallaCiudad(this, canvas);
+        pHoy = new PantallaHoy(this, canvas);
+        pEquilibrio = new PantallaEquilibrio(this, canvas);
+        pHacer = new PantallaHacer(this, canvas);
+        pCronometro = new PantallaCronometro(this, canvas);
+        pResultado = new PantallaResultado(this, canvas);
+        pCheckIn = new PantallaCheckIn(this, canvas);
+        pRegreso = new PantallaRegreso(this, canvas);
+        pAvatar = new PantallaAvatar(this, canvas);
+        pAlbum = new PantallaAlbum(this, canvas);
+        foreach (Pantalla p in Todas()) p.Ocultar();
+        CrearAviso(canvas);
+        Ciudad.AlTocarEdificio += pCiudad.AlTocarEdificio;
+        actual = null;
+        anterior = null;
+
+        Pantalla primera = pCiudad;
+        if (cargada)
+        {
+            double segundos = (DateTime.UtcNow.Ticks - d.guardadoUtcTicks) / (double)TimeSpan.TicksPerSecond;
+            int ausencia = (int)Math.Min(24 * 60, Math.Max(0, segundos * Velocidad));
+            if (!string.IsNullOrEmpty(d.accionEnCurso))
+            {
+                AccionEnCurso = Tabla.Buscar(d.accionEnCurso);
+                InicioAccion = d.inicioAccion;
+                MinutoJuego += ausencia; // el cronómetro siguió contando
+                pCronometro.Preparar(AccionEnCurso);
+                primera = pCronometro;
+            }
+            else if (ausencia >= Ajustes.MinutosAusenciaParaRegreso)
+            {
+                Jornada.SaltarTiempo(ausencia);
+                MinutoJuego = Jornada.MinutoActual;
+                MinutosAusencia = ausencia;
+                VieneDeAusencia = true;
+                primera = pRegreso;
+            }
+            else
+            {
+                MinutoJuego += ausencia;
+            }
+            Debug.Log("[Diario] Partida cargada. Ausencia: " + ausencia + " min de juego.");
+        }
+        else Debug.Log("[Diario] Partida nueva.");
+
+        if (primera == pCiudad && !Jornada.Datos.checkInHecho) primera = pCheckIn;
+        Mostrar(primera);
+        GuardarAhora();
+    }
+
+    private IEnumerable<Pantalla> Todas()
+    {
+        return new Pantalla[] { pCiudad, pHoy, pEquilibrio, pHacer, pCronometro, pResultado, pCheckIn, pRegreso, pAvatar, pAlbum };
     }
 
     private Transform CrearCanvas()
     {
-        var go = new GameObject("Interfaz", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        var canvas = go.GetComponent<Canvas>();
+        canvasGO = new GameObject("Interfaz", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        var canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        var escalador = go.GetComponent<CanvasScaler>();
+        var escalador = canvasGO.GetComponent<CanvasScaler>();
         escalador.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         escalador.referenceResolution = new Vector2(1080, 1920);
         escalador.matchWidthOrHeight = 0.5f;
-
-        if (FindAnyObjectByType<EventSystem>() == null)
-            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-        return go.transform;
+        return canvasGO.transform;
     }
+
+    private void CrearAviso(Transform canvas)
+    {
+        Image fondo = UIFabrica.Caja(canvas, "Aviso", new Color(0.29f, 0.2f, 0.15f, 0.92f));
+        fondo.raycastTarget = false;
+        RectTransform rt = fondo.rectTransform;
+        rt.anchorMin = new Vector2(0.05f, 1);
+        rt.anchorMax = new Vector2(0.95f, 1);
+        rt.pivot = new Vector2(0.5f, 1);
+        rt.sizeDelta = new Vector2(0, 150);
+        rt.anchoredPosition = new Vector2(0, -40);
+        aviso = UIFabrica.Texto(fondo.transform, "", 34, Paleta.Blanco, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(aviso.rectTransform, 0.03f, 0, 0.97f, 1);
+        fondo.gameObject.SetActive(false);
+    }
+
+    /// <summary>Muestra un aviso arriba unos segundos (logros, misiones...).</summary>
+    public void Avisar(string texto)
+    {
+        if (string.IsNullOrEmpty(texto)) return;
+        aviso.text = texto;
+        aviso.transform.parent.gameObject.SetActive(true);
+        aviso.transform.parent.SetAsLastSibling();
+        finAviso = Time.unscaledTime + 3.5f;
+    }
+
+    private void AvisarTodos(List<string> mensajes)
+    {
+        if (mensajes.Count > 0) Avisar(string.Join("\n", mensajes.ToArray()));
+    }
+
+    // ---------------------------------------------------------------- bucle
 
     private void Update()
     {
         MinutoJuego += Time.deltaTime * Velocidad;
         if (AccionEnCurso == null) Jornada.Avanzar(MinutoEntero);
         if (actual != null) actual.Actualizar();
+
+        if (aviso != null && aviso.transform.parent.gameObject.activeSelf && Time.unscaledTime > finAviso)
+            aviso.transform.parent.gameObject.SetActive(false);
+
+        if (Time.unscaledTime > proximoGuardado)
+        {
+            proximoGuardado = Time.unscaledTime + 5f;
+            string causa;
+            Ciudad.PonerEstado(EstadoAvatar.Calcular(Jornada.Estado, VieneDeAusencia, out causa));
+            GuardarAhora();
+        }
     }
+
+    private void OnApplicationPause(bool pausa) { if (pausa) GuardarAhora(); }
+    private void OnApplicationQuit() { GuardarAhora(); }
+
+    public void GuardarAhora()
+    {
+        if (Datos == null) return;
+        Datos.minutoJuego = MinutoJuego;
+        Datos.velocidad = Velocidad;
+        Datos.conAmigos = ConAmigos;
+        Datos.accionEnCurso = AccionEnCurso != null ? AccionEnCurso.id : "";
+        Datos.inicioAccion = InicioAccion;
+        Guardado.Guardar(Datos);
+    }
+
+    private void EscribirDiario(Evento e)
+    {
+        var sb = new StringBuilder("[Diario] Día ");
+        sb.Append(e.minutoInicio / 1440 + 1).Append(' ').Append(Jornada.Hora(e.minutoInicio)).Append(" | ").Append(e.texto);
+        if (!string.IsNullOrEmpty(e.nota)) sb.Append(" → ").Append(e.nota);
+        sb.Append(" | F ").Append(Mathf.RoundToInt(e.valores[0]))
+          .Append(" M ").Append(Mathf.RoundToInt(e.valores[1]))
+          .Append(" S ").Append(Mathf.RoundToInt(e.valores[2]))
+          .Append(" E ").Append(Mathf.RoundToInt(e.valores[3]))
+          .Append(" Á ").Append(Mathf.RoundToInt(e.valores[4]));
+        Debug.Log(sb.ToString());
+    }
+
+    // ---------------------------------------------------------------- navegación
 
     public void Mostrar(Pantalla pantalla)
     {
-        if (actual != null) actual.Ocultar();
+        if (actual != null && actual != pantalla) { actual.Ocultar(); anterior = actual; }
         actual = pantalla;
         pantalla.Mostrar();
         pantalla.Actualizar();
+        Ciudad.Activa = pantalla == pCiudad;
     }
 
-    public void IrAPrincipal() { Mostrar(principal); }
-    public void IrAHacer() { Mostrar(hacer); }
+    public void IrAPestana(int indice)
+    {
+        switch (indice)
+        {
+            case 0: Mostrar(pCiudad); break;
+            case 1: Mostrar(pHoy); break;
+            case 2: IrAHacer(); break;
+            case 3: Mostrar(pAvatar); break;
+            default: Mostrar(pAlbum); break;
+        }
+    }
+
+    public void IrAHacer() { Mostrar(pHacer); }
+    public void IrAEquilibrio() { Mostrar(pEquilibrio); }
+
+    public void Volver()
+    {
+        if (anterior != null && anterior != pHacer && anterior != pCronometro && anterior != pResultado) Mostrar(anterior);
+        else Mostrar(pCiudad);
+    }
+
+    // ---------------------------------------------------------------- acciones
 
     public void EmpezarAccion(DefinicionAccion accion)
     {
@@ -99,8 +284,10 @@ public class Juego : MonoBehaviour
         MinutoJuego = MinutoEntero;
         InicioAccion = MinutoEntero;
         AccionEnCurso = accion;
-        cronometro.Preparar(accion);
-        Mostrar(cronometro);
+        pCronometro.Preparar(accion);
+        Mostrar(pCronometro);
+        Debug.Log("[Diario] Empieza: " + accion.nombre + " a las " + Jornada.Hora(MinutoEntero));
+        GuardarAhora();
     }
 
     public void TerminarAccion()
@@ -111,26 +298,133 @@ public class Juego : MonoBehaviour
         bool conAmigos = ConAmigos && accion.socialConAmigosPorHora > 0;
         ResultadoAccion r = Jornada.HacerAccion(accion.id, (int)InicioAccion, minutos, conAmigos);
         MinutoJuego = Mathf.Max(MinutoJuego, Jornada.MinutoActual);
-        resultado.Preparar(r);
-        Mostrar(resultado);
+        Progreso.AlTerminarAccion(r, Jornada);
+        Debug.Log("[Diario] Recompensa: +" + r.xp + " XP, +" + r.monedas + " monedas. " + string.Join(" · ", r.mensajes.ToArray()));
+
+        if (diaPreguntas != Dia) { diaPreguntas = Dia; preguntasHoy = 0; }
+        bool preguntar = (r.minutos >= 60 || r.tramo == TramoDosis.Demasiado) && preguntasHoy < 2;
+        if (preguntar) preguntasHoy++;
+        pResultado.Preparar(r, preguntar);
+        Mostrar(pResultado);
+        GuardarAhora();
     }
 
     public void CancelarAccion()
     {
+        Debug.Log("[Diario] Acción cancelada: no cuenta.");
         AccionEnCurso = null;
-        Mostrar(principal);
+        Mostrar(pCiudad);
+        GuardarAhora();
     }
 
-    public void Dormir()
+    public void Valorar(ResultadoAccion r, int valoracion, string motivo)
     {
-        Jornada.Dormir(MinutoEntero, 8f);
-        MinutoJuego = Jornada.MinutoActual;
+        Jornada.Valorar(r, valoracion, motivo);
+        GuardarAhora();
     }
 
     public void HacerRapida(AccionRapida tipo)
     {
         Jornada.HacerAccionRapida(tipo);
-        string texto = tipo == AccionRapida.Agua ? "Vaso de agua" : tipo == AccionRapida.ComerBien ? "Comer bien" : "Ducha";
-        Jornada.Anotar(texto);
+        var mensajes = new List<string>();
+        Progreso.RevisarLogrosDeEstado(Jornada, mensajes);
+        AvisarTodos(mensajes);
+    }
+
+    public void SumarPasos(int pasos)
+    {
+        Jornada.SumarPasos(pasos);
+        Jornada.Anotar("+" + pasos + " pasos (total " + Jornada.Datos.pasosHoy + ")");
+        var mensajes = new List<string>();
+        Progreso.RevisarLogrosDeEstado(Jornada, mensajes);
+        AvisarTodos(mensajes);
+    }
+
+    public void Dormir()
+    {
+        int diaAntes = Jornada.Dia;
+        Jornada.Dormir(MinutoEntero, 8f);
+        // Si se ha dormido de día (por ejemplo, para probar), se salta en pausa hasta las 08:00 del día siguiente,
+        // para que siempre empiece un día nuevo con su check-in.
+        if (Jornada.Dia == diaAntes)
+        {
+            int manana = diaAntes * 1440 + 8 * 60;
+            Jornada.SaltarTiempo(manana - Jornada.MinutoActual);
+        }
+        MinutoJuego = Jornada.MinutoActual;
+        Mostrar(pCheckIn);
+        GuardarAhora();
+    }
+
+    public void CompletarCheckIn(int sueno, int sentir, List<Area> focos, bool arrastro)
+    {
+        Jornada.CheckIn(sueno, sentir, focos, arrastro);
+        Progreso.GenerarMisiones(Jornada);
+        Mostrar(pHoy);
+        Avisar("¡A por el día! Tienes " + Progreso.Datos.misiones.Count + " misiones en Hoy.");
+        GuardarAhora();
+    }
+
+    public void TerminarRegreso(List<KeyValuePair<string, int>> acciones)
+    {
+        var mensajes = new List<string>();
+        foreach (KeyValuePair<string, int> a in acciones)
+        {
+            ResultadoAccion r = Jornada.RegistrarPosterior(a.Key, a.Value);
+            Progreso.AlTerminarAccion(r, Jornada);
+            mensajes.AddRange(r.mensajes);
+        }
+        VieneDeAusencia = false;
+        if (acciones.Count > 0) mensajes.Insert(0, "Registrado. ¡Bienvenido de vuelta!");
+        AvisarTodos(mensajes);
+        Mostrar(Jornada.Datos.checkInHecho ? (Pantalla)pCiudad : pCheckIn);
+        GuardarAhora();
+    }
+
+    public void AsignarRol(int edificio, string rol)
+    {
+        Datos.ciudad.roles[edificio] = rol;
+        Ciudad.ActualizarEdificio(edificio);
+        RolEdificio r = Catalogos.BuscarRol(rol);
+        Debug.Log("[Diario] Edificio " + edificio + " → " + (r != null ? r.nombre : "sin papel"));
+        var mensajes = new List<string>();
+        if (Ciudad.RolesAsignados() >= 4) Progreso.Desbloquear("constructor", mensajes);
+        AvisarTodos(mensajes);
+        GuardarAhora();
+    }
+
+    public void ElegirPrenda(Prenda p)
+    {
+        var mensajes = new List<string>();
+        if (Progreso.Comprada(p.id)) Progreso.Poner(p);
+        else pAvatar.MostrarAviso(Progreso.Comprar(p, mensajes));
+        Ciudad.PonerRopa(Catalogos.BuscarPrenda(Progreso.Datos.ropaPuesta).colorHex);
+        AvisarTodos(mensajes);
+        GuardarAhora();
+    }
+
+    public void SimularAusencia(int minutos)
+    {
+        Jornada.SaltarTiempo(minutos);
+        MinutoJuego = Jornada.MinutoActual;
+        MinutosAusencia = minutos;
+        VieneDeAusencia = true;
+        Debug.Log("[Diario] Ausencia simulada de " + minutos + " min (sin castigo: barras en pausa).");
+        Mostrar(pRegreso);
+    }
+
+    public void CambiarSensibilidadPantallas()
+    {
+        SensibilidadPantallas s = Jornada.Datos.pantallas;
+        Jornada.Datos.pantallas = s == SensibilidadPantallas.Nada ? SensibilidadPantallas.Algo
+            : s == SensibilidadPantallas.Algo ? SensibilidadPantallas.Mucho : SensibilidadPantallas.Nada;
+    }
+
+    public void NuevaPartida()
+    {
+        Guardado.Borrar();
+        if (canvasGO != null) Destroy(canvasGO);
+        if (Ciudad != null) Destroy(Ciudad.gameObject);
+        Inicializar(PartidaNueva(), false);
     }
 }

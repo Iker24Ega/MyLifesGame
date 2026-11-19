@@ -4,7 +4,7 @@ Juego para móvil que convierte tu vida real en un juego. Declaras lo que haces 
 
 Tu avatar vive en una ciudad 3D inventada donde tú decides qué edificio es tu gimnasio, tu cafetería o tu casa, y refleja cómo te va: se le ve en forma, cansado o descuidado según lo que haces de verdad.
 
-> Proyecto de Iker Egaña. Estado: **Fase 1, prototipo del bucle** (sin ciudad todavía).
+> Proyecto de Iker Egaña. Estado: **mini demo jugable** (Fase 1): motor del equilibrio, todas las pantallas principales en versión mínima y una ciudad 3D de formas básicas.
 
 ## Tecnología
 
@@ -35,12 +35,34 @@ docs/             Documentos de diseño
 
 Las versiones de trabajo de estos documentos viven en el Project de Claude "My Life's Game"; las de aquí son copias que se actualizan de vez en cuando.
 
+## Cómo probar la demo
+
+1. Abre `MyLifesGame/` con Unity Hub (Unity 6.6).
+2. En la pestaña **Game**, elige una resolución vertical (1080 x 1920).
+3. Pulsa **Play**. No hace falta montar nada en la escena: `Juego.cs` lo crea todo.
+
+Qué hay en la demo:
+
+- **Check-in de la mañana**: sueño, ánimo, áreas a cuidar y "¿vienes arrastrando algo?".
+- **Ciudad** (3D): el avatar camina solo al edificio que tocas; modo construir para decidir qué es cada edificio, con pines por área.
+- **Hoy**: reloj con velocidades (x1, x60, x600), pasos del día (simulados), foco, misiones según tus áreas, agua, comidas y ducha.
+- **Tu equilibrio**: radar de las cinco áreas y filas con tramos.
+- **Hacer → Cronómetro → Resultado**: barra de dosis, cambios explicados, XP y monedas (provisionales) y la minipregunta "¿Qué tal ha ido?".
+- **Regreso tras horas fuera** (se puede simular desde Avatar): sin castigos, registras lo que hiciste.
+- **Avatar**: estado (en forma, normal, cansado, descuidado) y tienda de sudaderas.
+- **Álbum**: logros.
+- La partida **se guarda sola** (`partida.json` en la carpeta de datos de la app). "Nueva partida" en Avatar la reinicia.
+- Cada acción queda en la consola con el prefijo `[Diario]`.
+
+Reglas del equilibrio que ya aplica el motor: dosis por acción, Ánimo por equilibrio, rendimiento según cómo estás, periodo de gracia de 48 h, descanso activo, días seguidos entrenando, pantallas antes de dormir, fatiga mental, acciones rápidas, pasos, sueño, check-in, minipreguntas y registro posterior.
+
 ## Hoja de ruta de la Fase 1
 
-1. Motor del equilibrio en C# (áreas, acciones, dosis, reglas) y simulación del día de ejemplo.
-2. Pantallas 2D: Hacer, cronómetro, Resultado, Hoy.
-3. Guardado local.
+1. ✅ Motor del equilibrio en C# (áreas, acciones, dosis, reglas) y simulación del día de ejemplo.
+2. ✅ Pantallas en versión mínima: check-in, Ciudad, Hoy, Equilibrio, Hacer, cronómetro, Resultado, Regreso, Avatar y Álbum.
+3. ✅ Guardado local.
 4. Notificaciones locales.
-5. Contador de pasos.
+5. Contador de pasos real (sensor del móvil).
+6. Probar la versión web en el iPhone (Safari).
 
 La ciudad 3D llega después de comprobar que el bucle engancha.

@@ -25,11 +25,24 @@ namespace MyLifesGame.Motor
         public const float FactorCosteSinEnergia = 1.5f;
         public const float FactorAnimoSiAnimoBajo = 1.5f;
 
+        // Regla 3: periodo de gracia de 48 h y desgaste después (por día despierto, unos 16 h)
+        public const int MinutosGracia = 48 * 60;
+        public const float MinutosDespiertoPorDia = 16 * 60;
+        public const float DesgasteFisicoPorDia = 8f;
+        public const float DesgasteMentePorDia = 6f;
+        public const float DesgasteSocialPorDia = 10f;
+        public const float MinimoPorDesgaste = 10f;
+
         // Regla 4: descanso activo
         public const int VentanaDescansoActivoMin = 180;
         public const int MinutosMentalesParaDescansoActivo = 120;
         public const int MinutosConBonusDescansoActivo = 30;
         public const float ExtraDescansoActivo = 0.5f; // recarga 1,5 veces
+
+        // Regla 5: días seguidos entrenando
+        public const int DiasSeguidosParaCansancio = 4;
+        public const float FactorFisicoDiasSeguidos = 0.75f;
+        public const float EnergiaExtraDiasSeguidos = 5f;
 
         // Fatiga mental
         public const int MinutosFatigaMental = 360;
@@ -41,5 +54,16 @@ namespace MyLifesGame.Motor
 
         // Sueño
         public const float RecargaSuenoPorHora = 10f;
+
+        // Check-in
+        public static readonly float[] EnergiaSegunSueno = { 40f, 50f, 60f, 75f, 85f };
+        public static readonly float[] AnimoSegunSentir = { -10f, -5f, 0f, 5f, 10f };
+        public const float FactorDiaPesado = 1.25f;
+
+        // Registro posterior (lo que olvidaste iniciar)
+        public const float FactorRegistroPosterior = 0.7f;
+
+        // Ausencia: a partir de aquí sale la pantalla de regreso
+        public const int MinutosAusenciaParaRegreso = 6 * 60;
     }
 }

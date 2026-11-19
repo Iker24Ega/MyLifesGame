@@ -3,15 +3,22 @@ namespace MyLifesGame.Motor
     /// <summary>Valores actuales de las cinco áreas (0-100).</summary>
     public class EstadoAreas
     {
-        private readonly float[] valores = new float[5];
+        private readonly float[] valores;
 
         public EstadoAreas(float fisico, float mente, float social, float energia, float animo)
         {
+            valores = new float[5];
             valores[(int)Area.Fisico] = fisico;
             valores[(int)Area.Mente] = mente;
             valores[(int)Area.Social] = social;
             valores[(int)Area.Energia] = energia;
             valores[(int)Area.Animo] = animo;
+        }
+
+        /// <summary>Envuelve un array existente (por ejemplo, el de una partida guardada).</summary>
+        public EstadoAreas(float[] valoresExistentes)
+        {
+            valores = valoresExistentes;
         }
 
         public float this[Area area]
@@ -37,6 +44,8 @@ namespace MyLifesGame.Motor
         {
             return (float[])valores.Clone();
         }
+
+        public float[] Valores { get { return valores; } }
 
         private static float Limitar(float v)
         {

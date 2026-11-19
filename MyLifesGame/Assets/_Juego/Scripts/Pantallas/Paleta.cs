@@ -12,6 +12,10 @@ public static class Paleta
     public static readonly Color Verde = Hex("5BAA6B");
     public static readonly Color Gris = Hex("D9CFC2");
     public static readonly Color Blanco = Color.white;
+    public static readonly Color Piel = Hex("E8B98F");
+    public static readonly Color Pelo = Hex("4A2E1F");
+    public static readonly Color Mochila = Hex("4B4F57");
+    public static readonly Color Vaquero = Hex("4C6A9A");
 
     // Tramos de las barras
     public static readonly Color TramoPoco = Hex("F3DE9A");

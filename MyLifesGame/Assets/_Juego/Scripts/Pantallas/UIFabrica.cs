@@ -19,6 +19,19 @@ public static class UIFabrica
         get { if (redondeado == null) redondeado = CrearSpriteRedondeado(64, 24); return redondeado; }
     }
 
+    private static Sprite plano;
+
+    /// <summary>Sprite blanco liso (necesario para barras de relleno).</summary>
+    public static Sprite Plano
+    {
+        get
+        {
+            if (plano == null)
+                plano = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height), new Vector2(0.5f, 0.5f));
+            return plano;
+        }
+    }
+
     public static Sprite Circulo
     {
         get { if (circulo == null) circulo = CrearSpriteRedondeado(64, 32); return circulo; }

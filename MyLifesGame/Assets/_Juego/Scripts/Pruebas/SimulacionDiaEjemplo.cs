@@ -32,17 +32,19 @@ public static class SimulacionDiaEjemplo
     private static Jornada DiaA(TablaAcciones tabla)
     {
         // Check-in: he dormido bien (Energía 75), me siento bien (Ánimo 55). Social 25: varios días sin quedar.
-        var dia = new Jornada(tabla, new EstadoAreas(55, 50, 25, 75, 55), H(8));
+        var dia = Jornada.Nueva(tabla, new float[] { 55, 50, 25, 75, 55 }, H(8));
         dia.Avanzar(H(8, 15));
         dia.HacerAccionRapida(AccionRapida.Ducha);
         dia.HacerAccionRapida(AccionRapida.ComerBien);
-        dia.HacerAccionRapida(AccionRapida.Agua, 2);
+        dia.HacerAccionRapida(AccionRapida.Agua);
+        dia.HacerAccionRapida(AccionRapida.Agua);
         dia.Anotar("Ducha, desayuno y 2 vasos de agua");
         dia.HacerAccion("trabajar", H(9), 240);
         dia.HacerAccion("pasear", H(13), 30);
         dia.Avanzar(H(14));
         dia.HacerAccionRapida(AccionRapida.ComerBien);
-        dia.HacerAccionRapida(AccionRapida.Agua, 2);
+        dia.HacerAccionRapida(AccionRapida.Agua);
+        dia.HacerAccionRapida(AccionRapida.Agua);
         dia.Anotar("Comida y 2 vasos de agua");
         dia.HacerAccion("estudiar", H(15), 120);
         dia.HacerAccion("entrenar", H(18), 65);
@@ -50,20 +52,23 @@ public static class SimulacionDiaEjemplo
         dia.HacerAccion("videojuegos", H(22), 45);
         dia.Avanzar(H(23));
         dia.HacerAccionRapida(AccionRapida.ComerBien);
-        dia.HacerAccionRapida(AccionRapida.Agua, 2);
+        dia.HacerAccionRapida(AccionRapida.Agua);
+        dia.HacerAccionRapida(AccionRapida.Agua);
         dia.Anotar("Cena y 2 vasos de agua");
-        dia.RegistrarPasos(7500);
+        dia.SumarPasos(7500);
+        dia.Anotar("7.500 pasos fuera de acciones");
         dia.Dormir(H(23), 8);
         return dia;
     }
 
     private static Jornada DiaB(TablaAcciones tabla)
     {
-        var dia = new Jornada(tabla, new EstadoAreas(55, 50, 25, 75, 55), H(8));
+        var dia = Jornada.Nueva(tabla, new float[] { 55, 50, 25, 75, 55 }, H(8));
         dia.Avanzar(H(8, 15));
         dia.HacerAccionRapida(AccionRapida.Ducha);
         dia.HacerAccionRapida(AccionRapida.ComerBien);
-        dia.HacerAccionRapida(AccionRapida.Agua, 2);
+        dia.HacerAccionRapida(AccionRapida.Agua);
+        dia.HacerAccionRapida(AccionRapida.Agua);
         dia.Anotar("Ducha, desayuno y 2 vasos de agua");
         dia.HacerAccion("trabajar", H(9), 480);
         dia.HacerAccion("entrenar", H(18), 65);

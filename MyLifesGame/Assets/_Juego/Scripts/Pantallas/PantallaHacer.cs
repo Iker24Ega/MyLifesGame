@@ -31,7 +31,7 @@ public class PantallaHacer : Pantalla
 
         UIFabrica.Relleno(columna);
         RectTransform filaVolver = UIFabrica.Fila(columna, "Volver", 110);
-        Button volver = UIFabrica.Boton(filaVolver, "Volver", Paleta.Gris, Paleta.Texto, 38, () => this.juego.IrAPrincipal());
+        Button volver = UIFabrica.Boton(filaVolver, "Volver", Paleta.Gris, Paleta.Texto, 38, () => this.juego.Volver());
         UIFabrica.Anclar((RectTransform)volver.transform, 0, 0, 1, 1);
     }
 

@@ -8,6 +8,7 @@ namespace MyLifesGame.Motor
     public enum SensibilidadPantallas { Nada, Algo, Mucho }
 
     /// <summary>Una línea del registro del día: qué pasó y cómo quedaron las áreas.</summary>
+    [Serializable]
     public class Evento
     {
         public int minutoInicio;
@@ -17,70 +18,156 @@ namespace MyLifesGame.Motor
         public float[] valores; // Físico, Mente, Social, Energía, Ánimo
     }
 
+    [Serializable]
+    public class BloqueMental
+    {
+        public int inicio;
+        public int fin;
+    }
+
+    /// <summary>Todo lo que hay que guardar de la jornada para poder seguir otro día.</summary>
+    [Serializable]
+    public class DatosJornada
+    {
+        public float[] areas = { 50, 50, 50, 75, 50 };
+        public int minutoActual;
+        public int proximaRevision;
+        public List<BloqueMental> bloquesMentales = new List<BloqueMental>();
+        public int minutosMentalesHoy;
+        public int vasosAgua;
+        public int comidasBuenas;
+        public bool duchaHecha;
+        public int finUltimaAccionSueno = -100000;
+        public int[] ultimoCuidado = new int[5];
+        public int diasSeguidosEntrenando;
+        public int ultimoDiaEntreno = -10;
+        public int pasosHoy;
+        public bool diaPesado;
+        public bool checkInHecho;
+        public List<int> focos = new List<int>();
+        public SensibilidadPantallas pantallas = SensibilidadPantallas.Algo;
+        public int metaAgua = Ajustes.MetaAguaPorDefecto;
+        public List<Evento> eventos = new List<Evento>();
+    }
+
     /// <summary>Lo que ha cambiado al terminar una acción, para la pantalla de Resultado.</summary>
     public class ResultadoAccion
     {
         public DefinicionAccion accion;
         public int minutos;
         public TramoDosis tramo;
+        public bool posterior;
         public readonly float[] cambios = new float[5];
         public readonly List<string> notas = new List<string>();
-        public bool DosisOptima { get { return tramo == TramoDosis.ZonaOptima; } }
+        public int xp;
+        public int monedas;
+        public readonly List<string> mensajes = new List<string>(); // recompensas, misiones y logros
+        public bool DosisOptima { get { return tramo == TramoDosis.ZonaOptima && !posterior; } }
     }
 
     /// <summary>
-    /// Un día del jugador. Aplica las reglas del equilibrio (docs/fase-1-acciones-y-curvas.md, v0.4):
-    /// dosis, regla 1 (Ánimo por equilibrio), regla 2 (según cómo estás), regla 4 (descanso activo),
-    /// regla 6 (pantallas antes de dormir), fatiga mental, desgaste de Energía, acciones rápidas, pasos y sueño.
-    /// Las reglas de varios días (3 y 5) llegarán con el guardado.
+    /// El día a día del jugador. Aplica las reglas del equilibrio (docs/fase-1-acciones-y-curvas.md, v0.4):
+    /// dosis, reglas 1 a 7, fatiga mental, desgaste de Energía, check-in, minipreguntas, pasos y sueño.
     /// </summary>
     public class Jornada
     {
+        public DatosJornada Datos { get; private set; }
         public EstadoAreas Estado { get; private set; }
-        public int MinutoActual { get; private set; }
-        public List<Evento> Eventos { get; private set; }
-        public SensibilidadPantallas Pantallas = SensibilidadPantallas.Algo;
-        public int MetaAgua = Ajustes.MetaAguaPorDefecto;
+        public int MinutoActual { get { return Datos.minutoActual; } }
+        public List<Evento> Eventos { get { return Datos.eventos; } }
+        public int Dia { get { return Datos.minutoActual / 1440 + 1; } }
 
         private readonly TablaAcciones tabla;
-        private int proximaRevision;
-        private readonly List<int[]> bloquesMentales = new List<int[]>(); // [inicio, fin) en minutos
-        private int minutosMentalesHoy;
-        private int vasosAgua;
-        private int comidasBuenas;
-        private bool duchaHecha;
-        private int finUltimaAccionQueAfectaSueno = int.MinValue / 2;
 
-        public Jornada(TablaAcciones tabla, EstadoAreas inicio, int minutoDespertar)
+        /// <summary>Retoma una jornada guardada.</summary>
+        public Jornada(TablaAcciones tabla, DatosJornada datos)
         {
             this.tabla = tabla;
-            Estado = inicio;
-            MinutoActual = minutoDespertar;
-            Eventos = new List<Evento>();
-            proximaRevision = minutoDespertar + Ajustes.MinutosEntreRevisiones;
-            Registrar(minutoDespertar, minutoDespertar, "Check-in", "");
+            Datos = datos;
+            Estado = new EstadoAreas(datos.areas);
         }
 
-        /// <summary>Hace pasar el tiempo: desgaste de Energía y revisiones del equilibrio cada 6 h.</summary>
+        /// <summary>Empieza una partida nueva.</summary>
+        public static Jornada Nueva(TablaAcciones tabla, float[] valoresIniciales, int minutoDespertar)
+        {
+            var d = new DatosJornada();
+            d.areas = (float[])valoresIniciales.Clone();
+            d.minutoActual = minutoDespertar;
+            d.proximaRevision = minutoDespertar + Ajustes.MinutosEntreRevisiones;
+            for (int i = 0; i < 5; i++) d.ultimoCuidado[i] = minutoDespertar;
+            var j = new Jornada(tabla, d);
+            j.Registrar(minutoDespertar, minutoDespertar, "Empieza tu partida", "");
+            return j;
+        }
+
+        // ---------------------------------------------------------------- tiempo
+
+        /// <summary>Hace pasar el tiempo: desgaste de Energía, desgaste tras 48 h sin cuidar un área y revisiones cada 6 h.</summary>
         public void Avanzar(int hasta)
         {
-            while (MinutoActual < hasta)
+            while (Datos.minutoActual < hasta)
             {
-                int siguiente = Math.Min(hasta, proximaRevision);
-                Estado.Sumar(Area.Energia, -Ajustes.DesgasteEnergiaPorHora * (siguiente - MinutoActual) / 60f);
-                MinutoActual = siguiente;
-                if (MinutoActual == proximaRevision)
+                int siguiente = Math.Min(hasta, Datos.proximaRevision);
+                int minutos = siguiente - Datos.minutoActual;
+                Estado.Sumar(Area.Energia, -Ajustes.DesgasteEnergiaPorHora * minutos / 60f);
+                DesgastePorDescuido(Area.Fisico, Ajustes.DesgasteFisicoPorDia, minutos, siguiente);
+                DesgastePorDescuido(Area.Mente, Ajustes.DesgasteMentePorDia, minutos, siguiente);
+                DesgastePorDescuido(Area.Social, Ajustes.DesgasteSocialPorDia, minutos, siguiente);
+                Datos.minutoActual = siguiente;
+                if (Datos.minutoActual == Datos.proximaRevision)
                 {
                     RevisarEquilibrio();
-                    proximaRevision += Ajustes.MinutosEntreRevisiones;
+                    Datos.proximaRevision += Ajustes.MinutosEntreRevisiones;
                 }
             }
         }
+
+        // Regla 3: solo baja si llevas más de 48 h sin cuidar el área, y nunca por debajo de 10.
+        private void DesgastePorDescuido(Area area, float porDia, int minutos, int hasta)
+        {
+            int limite = Datos.ultimoCuidado[(int)area] + Ajustes.MinutosGracia;
+            int minutosDescuidados = Math.Min(minutos, hasta - limite);
+            if (minutosDescuidados <= 0) return;
+            if (Estado[area] <= Ajustes.MinimoPorDesgaste) return;
+            float baja = porDia * minutosDescuidados / Ajustes.MinutosDespiertoPorDia;
+            Estado[area] = Math.Max(Ajustes.MinimoPorDesgaste, Estado[area] - baja);
+        }
+
+        /// <summary>Tiempo que pasa en pausa (ausencias): no hay desgaste ni castigo.</summary>
+        public void SaltarTiempo(int minutos)
+        {
+            if (minutos <= 0) return;
+            Datos.minutoActual += minutos;
+            Datos.proximaRevision += minutos;
+            for (int i = 0; i < 5; i++) Datos.ultimoCuidado[i] += minutos;
+        }
+
+        // ---------------------------------------------------------------- acciones
 
         /// <summary>Hace una acción con cronómetro y devuelve qué ha cambiado y por qué.</summary>
         public ResultadoAccion HacerAccion(string idAccion, int inicio, int minutos, bool conAmigos = false)
         {
             Avanzar(inicio);
+            ResultadoAccion r = CalcularAccion(idAccion, inicio, minutos, conAmigos, 1f);
+            Avanzar(inicio + minutos);
+            Registrar(inicio, inicio + minutos, r.accion.nombre + " " + Duracion(minutos) + (conAmigos ? " (con amigos)" : ""),
+                string.Join("; ", r.notas));
+            return r;
+        }
+
+        /// <summary>Lo que olvidaste iniciar: cuenta al 70 % y sin bonus de dosis óptima.</summary>
+        public ResultadoAccion RegistrarPosterior(string idAccion, int minutos)
+        {
+            ResultadoAccion r = CalcularAccion(idAccion, Datos.minutoActual - minutos, minutos, false, Ajustes.FactorRegistroPosterior);
+            r.posterior = true;
+            r.notas.Add("Registrado después: cuenta un poco menos");
+            Registrar(Datos.minutoActual, Datos.minutoActual, r.accion.nombre + " " + Duracion(minutos) + " (registrado después)",
+                string.Join("; ", r.notas));
+            return r;
+        }
+
+        private ResultadoAccion CalcularAccion(string idAccion, int inicio, int minutos, bool conAmigos, float factor)
+        {
             DefinicionAccion accion = tabla.Buscar(idAccion);
             var r = new ResultadoAccion { accion = accion, minutos = minutos, tramo = accion.Tramo(minutos) };
 
@@ -90,10 +177,29 @@ namespace MyLifesGame.Motor
             if (sinEnergia) r.notas.Add("Ibas sin energía: rinde menos");
             if (animoBajo) r.notas.Add("Lo necesitabas: te ha sentado mejor");
 
+            // Día pesado (check-in "vengo arrastrando algo")
+            bool pesado = Datos.diaPesado && accion.esfuerzo;
+            if (pesado) r.notas.Add("Día pesado: cansa un poco más");
+
             // Regla 4: descanso activo
             bool descansoActivo = accion.desconexion &&
                 MinutosMentalesEntre(inicio - Ajustes.VentanaDescansoActivoMin, inicio) >= Ajustes.MinutosMentalesParaDescansoActivo;
             if (descansoActivo) r.notas.Add("Desconectar tras trabajar o estudiar recarga más");
+
+            // Regla 5: días seguidos entrenando
+            bool cansancioAcumulado = false;
+            if (accion.id == "entrenar")
+            {
+                int dia = inicio / 1440;
+                if (dia == Datos.ultimoDiaEntreno + 1) Datos.diasSeguidosEntrenando++;
+                else if (dia != Datos.ultimoDiaEntreno) Datos.diasSeguidosEntrenando = 1;
+                Datos.ultimoDiaEntreno = dia;
+                if (Datos.diasSeguidosEntrenando >= Ajustes.DiasSeguidosParaCansancio)
+                {
+                    cansancioAcumulado = true;
+                    r.notas.Add("Llevas " + Datos.diasSeguidosEntrenando + " días seguidos: tu cuerpo pide descanso");
+                }
+            }
 
             bool fatigaAvisada = false;
             for (int m = 0; m < minutos; m++)
@@ -108,82 +214,123 @@ namespace MyLifesGame.Motor
                         if (area == Area.Energia && v < 0) v *= Ajustes.FactorCosteSinEnergia;
                         else if (v > 0) v *= Ajustes.FactorBeneficioSinEnergia;
                     }
+                    if (pesado && area == Area.Energia && v < 0) v *= Ajustes.FactorDiaPesado;
                     if (animoBajo && area == Area.Animo && v > 0) v *= Ajustes.FactorAnimoSiAnimoBajo;
-                    if (accion.mental && area == Area.Mente && minutosMentalesHoy + m >= Ajustes.MinutosFatigaMental)
+                    if (cansancioAcumulado && area == Area.Fisico && v > 0) v *= Ajustes.FactorFisicoDiasSeguidos;
+                    if (accion.mental && area == Area.Mente && Datos.minutosMentalesHoy + m >= Ajustes.MinutosFatigaMental)
                     {
                         v *= Ajustes.FactorFatigaMental;
                         if (!fatigaAvisada) { r.notas.Add("Mucho esfuerzo mental hoy: rinde menos"); fatigaAvisada = true; }
                     }
                     if (descansoActivo && area == Area.Energia && v > 0 && m < Ajustes.MinutosConBonusDescansoActivo)
                         v += v * Ajustes.ExtraDescansoActivo;
-                    r.cambios[(int)area] += v;
+                    r.cambios[(int)area] += v * factor;
                 }
             }
+            if (cansancioAcumulado) r.cambios[(int)Area.Energia] -= Ajustes.EnergiaExtraDiasSeguidos;
 
-            if (r.tramo == TramoDosis.ZonaOptima) r.notas.Add("Dosis óptima");
+            if (r.tramo == TramoDosis.ZonaOptima && factor >= 1f) r.notas.Add("Dosis óptima");
             if (r.tramo == TramoDosis.Demasiado) r.notas.Add("Te has pasado: cansa más de lo que aporta");
 
-            foreach (Area area in Areas.Todas) Estado.Sumar(area, r.cambios[(int)area]);
+            foreach (Area area in Areas.Todas)
+            {
+                Estado.Sumar(area, r.cambios[(int)area]);
+                if (r.cambios[(int)area] > 0.5f) Datos.ultimoCuidado[(int)area] = Math.Max(Datos.ultimoCuidado[(int)area], inicio + minutos);
+            }
 
             if (accion.mental)
             {
-                bloquesMentales.Add(new[] { inicio, inicio + minutos });
-                minutosMentalesHoy += minutos;
+                Datos.bloquesMentales.Add(new BloqueMental { inicio = inicio, fin = inicio + minutos });
+                Datos.minutosMentalesHoy += minutos;
             }
-            if (accion.afectaSueno) finUltimaAccionQueAfectaSueno = inicio + minutos;
-
-            Avanzar(inicio + minutos);
-            Registrar(inicio, inicio + minutos, accion.nombre + " " + Duracion(minutos) + (conAmigos ? " (con amigos)" : ""),
-                string.Join("; ", r.notas));
+            if (accion.afectaSueno) Datos.finUltimaAccionSueno = Math.Max(Datos.finUltimaAccionSueno, inicio + minutos);
             return r;
         }
 
-        /// <summary>Hábitos de un toque, sin cronómetro (regla 7).</summary>
-        public void HacerAccionRapida(AccionRapida tipo, int veces = 1)
+        /// <summary>
+        /// Minipregunta "¿Qué tal ha ido?" (9.1): -1 = peor, 0 = normal, 1 = mejor.
+        /// Peor: la acción ha costado más Energía; mejor: ha costado menos.
+        /// </summary>
+        public void Valorar(ResultadoAccion r, int valoracion, string motivo)
         {
-            for (int i = 0; i < veces; i++)
+            if (valoracion == 0) return;
+            float coste = Math.Max(0f, -r.cambios[(int)Area.Energia]);
+            float ajuste = 2f + coste * 0.5f;
+            float delta = valoracion < 0 ? -ajuste : ajuste;
+            Estado.Sumar(Area.Energia, delta);
+            r.cambios[(int)Area.Energia] += delta;
+            string texto = valoracion < 0 ? "Hoy te ha costado más: lo tengo en cuenta" : "Te ha ido mejor de lo normal";
+            if (!string.IsNullOrEmpty(motivo)) texto += " (" + motivo + ")";
+            r.notas.Add(texto);
+            Registrar(Datos.minutoActual, Datos.minutoActual, "¿Qué tal ha ido? " + (valoracion < 0 ? "Peor" : "Mejor"), texto);
+        }
+
+        /// <summary>Hábitos de un toque, sin cronómetro (regla 7).</summary>
+        public void HacerAccionRapida(AccionRapida tipo)
+        {
+            switch (tipo)
             {
-                switch (tipo)
-                {
-                    case AccionRapida.Agua:
-                        if (vasosAgua < MetaAgua) Estado.Sumar(Area.Energia, 1f);
-                        vasosAgua++;
-                        break;
-                    case AccionRapida.ComerBien:
-                        if (comidasBuenas < Ajustes.MaxComidasBuenas)
-                        {
-                            Estado.Sumar(Area.Energia, 3f);
-                            Estado.Sumar(Area.Animo, 1f);
-                        }
-                        comidasBuenas++;
-                        break;
-                    case AccionRapida.Ducha:
-                        if (!duchaHecha)
-                        {
-                            Estado.Sumar(Area.Animo, 2f);
-                            Estado.Sumar(Area.Energia, 2f);
-                        }
-                        duchaHecha = true;
-                        break;
-                }
+                case AccionRapida.Agua:
+                    if (Datos.vasosAgua < Datos.metaAgua) Estado.Sumar(Area.Energia, 1f);
+                    Datos.vasosAgua++;
+                    Registrar(Datos.minutoActual, Datos.minutoActual, "Vaso de agua (" + Datos.vasosAgua + "/" + Datos.metaAgua + ")", "");
+                    break;
+                case AccionRapida.ComerBien:
+                    if (Datos.comidasBuenas < Ajustes.MaxComidasBuenas)
+                    {
+                        Estado.Sumar(Area.Energia, 3f);
+                        Estado.Sumar(Area.Animo, 1f);
+                    }
+                    Datos.comidasBuenas++;
+                    Registrar(Datos.minutoActual, Datos.minutoActual, "Comer bien", "");
+                    break;
+                case AccionRapida.Ducha:
+                    if (!Datos.duchaHecha)
+                    {
+                        Estado.Sumar(Area.Animo, 2f);
+                        Estado.Sumar(Area.Energia, 2f);
+                    }
+                    Datos.duchaHecha = true;
+                    Registrar(Datos.minutoActual, Datos.minutoActual, "Ducha", "");
+                    break;
             }
         }
 
-        /// <summary>Pasos dados fuera de las acciones con cronómetro (sin doble conteo).</summary>
-        public void RegistrarPasos(int pasos)
+        /// <summary>Suma pasos dados fuera de las acciones (sin doble conteo). Aplica solo la diferencia.</summary>
+        public void SumarPasos(int pasos)
+        {
+            if (pasos <= 0) return;
+            float[] antes = EfectoPasos(Datos.pasosHoy);
+            Datos.pasosHoy += pasos;
+            float[] despues = EfectoPasos(Datos.pasosHoy);
+            Estado.Sumar(Area.Fisico, despues[0] - antes[0]);
+            Estado.Sumar(Area.Energia, despues[1] - antes[1]);
+            if (despues[0] - antes[0] > 0.01f) Datos.ultimoCuidado[(int)Area.Fisico] = Datos.minutoActual;
+        }
+
+        private static float[] EfectoPasos(int pasos)
         {
             float miles = pasos / 1000f;
             float extraZonaBuena = Limitar(miles - 6f, 0f, 6f);
             float fisico = Math.Min(miles, 6f) + extraZonaBuena;
             float energia = extraZonaBuena * 0.5f;
-            string nota = "";
-            if (pasos > 18000) { energia -= 5f; nota = "Muchísimos pasos: cansancio"; }
-            Estado.Sumar(Area.Fisico, fisico);
-            Estado.Sumar(Area.Energia, energia);
-            Registrar(MinutoActual, MinutoActual, pasos.ToString("N0", CultureInfo.GetCultureInfo("es-ES")) + " pasos fuera de acciones", nota);
+            if (pasos > 18000) energia -= 5f;
+            return new[] { fisico, energia };
         }
 
-        /// <summary>Dormir: recarga Energía según las horas y la regla 6 (pantallas antes de dormir).</summary>
+        /// <summary>Check-in de la mañana. caraSueno y sentir van de 0 (peor) a 4 (mejor).</summary>
+        public void CheckIn(int caraSueno, int sentir, List<Area> focos, bool arrastroAlgo)
+        {
+            Estado[Area.Energia] = Ajustes.EnergiaSegunSueno[Clamp(caraSueno, 0, 4)];
+            Estado.Sumar(Area.Animo, Ajustes.AnimoSegunSentir[Clamp(sentir, 0, 4)]);
+            Datos.focos.Clear();
+            foreach (Area a in focos) Datos.focos.Add((int)a);
+            Datos.diaPesado = arrastroAlgo;
+            Datos.checkInHecho = true;
+            Registrar(Datos.minutoActual, Datos.minutoActual, "Check-in de la mañana", arrastroAlgo ? "Día pesado: el esfuerzo cansa un poco más" : "");
+        }
+
+        /// <summary>Dormir: recarga Energía según las horas y la regla 6. Al despertar empieza un día nuevo.</summary>
         public void Dormir(int minutoAcostarse, float horas)
         {
             Avanzar(minutoAcostarse);
@@ -195,10 +342,10 @@ namespace MyLifesGame.Motor
             else if (horas >= 7f && horas <= 9f) Estado.Sumar(Area.Animo, 5f);
             else if (horas > 10f) { Estado.Sumar(Area.Animo, -3f); notas.Add("Has dormido de más"); }
 
-            bool pantallas = minutoAcostarse - finUltimaAccionQueAfectaSueno <= 60;
-            if (pantallas && Pantallas != SensibilidadPantallas.Nada)
+            bool pantallas = minutoAcostarse - Datos.finUltimaAccionSueno <= 60;
+            if (pantallas && Datos.pantallas != SensibilidadPantallas.Nada)
             {
-                tope = Math.Min(tope, Pantallas == SensibilidadPantallas.Algo ? 85f : 75f);
+                tope = Math.Min(tope, Datos.pantallas == SensibilidadPantallas.Algo ? 85f : 75f);
                 notas.Add("Pantallas antes de dormir: te levantas con menos energía");
             }
             if (Estado[Area.Energia] > tope) Estado[Area.Energia] = tope;
@@ -207,25 +354,30 @@ namespace MyLifesGame.Motor
             Registrar(minutoAcostarse, despertar, "Dormir " + horas.ToString("0.#", CultureInfo.InvariantCulture) + " h",
                 string.Join("; ", notas));
 
-            // Durante el sueño no hay desgaste. Al despertar empieza un día nuevo.
-            MinutoActual = despertar;
-            proximaRevision = despertar + Ajustes.MinutosEntreRevisiones;
-            bloquesMentales.Clear();
-            minutosMentalesHoy = 0;
-            vasosAgua = 0;
-            comidasBuenas = 0;
-            duchaHecha = false;
+            // Durante el sueño no hay desgaste: el tiempo dormido no consume el periodo de gracia.
+            int dormido = despertar - minutoAcostarse;
+            for (int i = 0; i < 5; i++) Datos.ultimoCuidado[i] += dormido;
+            Datos.minutoActual = despertar;
+            Datos.proximaRevision = despertar + Ajustes.MinutosEntreRevisiones;
+            Datos.bloquesMentales.Clear();
+            Datos.minutosMentalesHoy = 0;
+            Datos.vasosAgua = 0;
+            Datos.comidasBuenas = 0;
+            Datos.duchaHecha = false;
+            Datos.pasosHoy = 0;
+            Datos.diaPesado = false;
+            Datos.checkInHecho = false;
+            Datos.focos.Clear();
         }
 
-        public int VasosAgua { get { return vasosAgua; } }
-        public int ComidasBuenas { get { return comidasBuenas; } }
-        public bool DuchaHecha { get { return duchaHecha; } }
-
-        /// <summary>Añade una línea al registro con el estado actual (por ejemplo, tras acciones rápidas).</summary>
+        /// <summary>Añade una línea al registro con el estado actual.</summary>
         public void Anotar(string texto, string nota = "")
         {
-            Registrar(MinutoActual, MinutoActual, texto, nota);
+            Registrar(Datos.minutoActual, Datos.minutoActual, texto, nota);
         }
+
+        /// <summary>Se llama cuando alguien se registra en el registro (para el diario de partida).</summary>
+        public event Action<Evento> AlRegistrar;
 
         // Regla 1: cada 6 h despierto, el Ánimo sube si las otras áreas están bien y baja por cada una en "Poco".
         private void RevisarEquilibrio()
@@ -246,23 +398,31 @@ namespace MyLifesGame.Motor
                 Estado.Sumar(Area.Animo, -baja);
                 nota = "Tener " + string.Join(" y ", bajas) + " bajo te pesa (−" + baja + ")";
             }
-            Registrar(MinutoActual, MinutoActual, "Revisión del equilibrio", nota);
+            Registrar(Datos.minutoActual, Datos.minutoActual, "Revisión del equilibrio", nota);
         }
 
         private int MinutosMentalesEntre(int desde, int hasta)
         {
             int total = 0;
-            foreach (var b in bloquesMentales)
-                total += Math.Max(0, Math.Min(b[1], hasta) - Math.Max(b[0], desde));
+            foreach (BloqueMental b in Datos.bloquesMentales)
+                total += Math.Max(0, Math.Min(b.fin, hasta) - Math.Max(b.inicio, desde));
             return total;
         }
 
         private void Registrar(int inicio, int fin, string texto, string nota)
         {
-            Eventos.Add(new Evento { minutoInicio = inicio, minutoFin = fin, texto = texto, nota = nota, valores = Estado.Copia() });
+            var e = new Evento { minutoInicio = inicio, minutoFin = fin, texto = texto, nota = nota, valores = Estado.Copia() };
+            Datos.eventos.Add(e);
+            if (Datos.eventos.Count > 200) Datos.eventos.RemoveAt(0);
+            if (AlRegistrar != null) AlRegistrar(e);
         }
 
         private static float Limitar(float v, float min, float max)
+        {
+            return v < min ? min : (v > max ? max : v);
+        }
+
+        private static int Clamp(int v, int min, int max)
         {
             return v < min ? min : (v > max ? max : v);
         }

@@ -181,6 +181,12 @@ def main() -> None:
             print(f"  aviso: no encuentro la imagen '{f}' en {ENTRADA}")
 
     pendientes = {k: v for k, v in grupos.items() if args.rehacer or not (SALIDA / f"{k}.glb").exists()}
+    # Orden de prioridad (el cupo gratis da para pocas piezas al día): primero lo que más se ve en la ciudad
+    prioridad = ("edificio_", "relleno_", "parcela_", "farola", "fuente", "puente", "valla", "maceta", "buzon",
+                 "mesa_", "personaje_", "mochila", "sala_", "mancuerna", "libro", "mando", "botella")
+    def orden(nombre: str) -> int:
+        return next((i for i, p in enumerate(prioridad) if nombre.startswith(p)), len(prioridad))
+    pendientes = dict(sorted(pendientes.items(), key=lambda kv: (orden(kv[0]), kv[0])))
     print(f"{len(grupos)} piezas con imagen, {len(pendientes)} por generar.")
     if not pendientes:
         return

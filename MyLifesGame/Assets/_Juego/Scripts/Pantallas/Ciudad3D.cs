@@ -323,6 +323,7 @@ public partial class Ciudad3D : MonoBehaviour
     {
         Transform p = s.modelo.transform;
         Vector3 c = s.centro + new Vector3(0, 0, 0.8f);
+        if (ModeloGenerado(rol, indice, p, s.centro)) return;
         switch (rol)
         {
             case "casa": Modelo("Ciudad/Suburban/building-type-a", p, c, AnchoSolar, 180f); Valla(p, c); break;
@@ -349,6 +350,27 @@ public partial class Ciudad3D : MonoBehaviour
                 Modelo("Ciudad/Suburban/building-type-" + "fgjnpqrstu"[indice % 10], p, c, AnchoSolar * 0.9f, 180f);
                 break;
         }
+    }
+
+    // Modelos generados a partir de las imágenes de Flow (Resources/Modelos3D). Si existen, sustituyen a Kenney.
+    private static readonly Dictionary<string, string> ModelosPorRol = new Dictionary<string, string>
+    {
+        { "casa", "edificio_casa" }, { "gimnasio", "edificio_gimnasio" }, { "cafeteria", "edificio_cafe" },
+        { "biblioteca", "edificio_biblioteca" }, { "trabajo", "edificio_oficina" }, { "recreativos", "edificio_recreativos" },
+        { "parque", "parcela_parque" }, { "amigos", "relleno_pisos_crema" },
+    };
+    private static readonly string[] Relleno = { "relleno_casa_menta", "relleno_esquina_melocoton", "relleno_pisos_crema" };
+
+    private bool ModeloGenerado(string rol, int indice, Transform p, Vector3 centro)
+    {
+        string nombre;
+        if (rol == null || !ModelosPorRol.TryGetValue(rol, out nombre)) nombre = Relleno[indice % Relleno.Length];
+        if (!Modelos3D.Existe(nombre)) return false;
+        GameObject go = Modelos3D.Crear(nombre, p, AnchoSolar * 1.1f);
+        go.transform.localPosition = centro;
+        // El frente del modelo mira hacia la cámara de la ciudad, como en la imagen de Flow
+        go.transform.localRotation = Quaternion.identity;
+        return true;
     }
 
     private void Valla(Transform p, Vector3 c)
@@ -537,6 +559,9 @@ public partial class Ciudad3D : MonoBehaviour
         Quaternion giro = Quaternion.Euler(0, GiroCamara, 0);
         Vector3 objetivo = avatar.position + desplazamiento + Vector3.up * 2f + giro * Vector3.forward * 12f;
         Vector3 deseada = objetivo + giro * new Vector3(0, 50f, -54f) * zoom;
+        // La neblina se aleja con el zoom: al alejarse no se lava todo de beige
+        RenderSettings.fogStartDistance = 70f * zoom;
+        RenderSettings.fogEndDistance = 160f * zoom;
         float k = instantaneo ? 1f : 1f - Mathf.Exp(-6f * Time.deltaTime);
         camara.transform.position = Vector3.Lerp(camara.transform.position, deseada, k);
         camara.transform.rotation = Quaternion.Slerp(camara.transform.rotation, Quaternion.LookRotation(objetivo - deseada), k);

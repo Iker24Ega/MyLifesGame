@@ -21,7 +21,7 @@ if not exist ".venv\Scripts\python.exe" (
   echo Preparando el entorno la primera vez...
   %PY% -m venv .venv
 )
-".venv\Scripts\python.exe" -m pip install -q --disable-pip-version-check --upgrade gradio_client huggingface_hub
+".venv\Scripts\python.exe" -m pip install -q --disable-pip-version-check --upgrade gradio_client huggingface_hub pillow
 
 rem --- Token de Hugging Face (solo la primera vez) ---
 if not exist "hf_token.txt" (

@@ -198,6 +198,11 @@ def main() -> None:
                 glb = generar(cliente, vistas, args)
                 destino = SALIDA / f"{nombre}.glb"
                 shutil.copy(glb, destino)
+                try:  # TRELLIS hornea sombras y apaga colores: se aclaran para el estilo de Flow
+                    from corregir_color_glb import corregir_glb
+                    corregir_glb(destino, copia_original=SALIDA.parent / "modelos3d_originales" / destino.name)
+                except Exception as e:
+                    print(f"    (sin corrección de color: {e})")
                 datos = info_glb(destino)
                 datos.update({"vistas": [v.name for v in vistas], "semilla": args.semilla,
                               "espacio": espacio, "segundos": round(time.time() - t0)})

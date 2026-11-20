@@ -13,6 +13,8 @@ public static class Modelos3D
 
     private static readonly Dictionary<string, GameObject> cache = new Dictionary<string, GameObject>();
     private static Shader litUrp;
+    /// <summary>Cuánta luz propia llevan los modelos generados (0 = ninguna).</summary>
+    public static float Brillo = 0.35f;
 
     /// <summary>¿Hay modelo con ese nombre? (p. ej. "edificio_gimnasio").</summary>
     public static bool Existe(string nombre)
@@ -104,6 +106,15 @@ public static class Modelos3D
                 Color color = Color(o, "baseColorFactor", "_BaseColor", "_Color");
                 if (tex != null) m.SetTexture("_BaseMap", tex);
                 m.SetColor("_BaseColor", color);
+                // Un poco de luz propia con la misma textura: aclara las sombras horneadas y da el aspecto
+                // suave y luminoso de las imágenes de Flow
+                if (tex != null)
+                {
+                    m.EnableKeyword("_EMISSION");
+                    m.SetTexture("_EmissionMap", tex);
+                    m.SetColor("_EmissionColor", color * Brillo);
+                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                }
                 m.SetFloat("_Metallic", 0f);
                 m.SetFloat("_Smoothness", 0.18f);
                 mates[o] = m;

@@ -238,6 +238,13 @@ public partial class Ciudad3D
 
     private void ArbolEn(Transform padre, Vector3 p, int k, float tam)
     {
+        if (Modelos3D.Existe("arbol"))
+        {
+            GameObject g = Modelos3D.Crear("arbol", padre, tam * 1.25f * (0.88f + ((k * 37) % 10) * 0.03f), Modelos3D.Medida.Alto);
+            g.transform.localPosition = p;
+            g.transform.localRotation = Quaternion.Euler(0, k * 47f, 0);
+            return;
+        }
         float s = tam / 2.6f * (0.88f + ((k * 37) % 10) * 0.03f);
         Transform t = new GameObject("Árbol").transform;
         t.SetParent(padre, false);

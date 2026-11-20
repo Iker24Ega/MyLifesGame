@@ -74,6 +74,15 @@ public static class AutomatizacionClaude
                 return;
             }
 
+            string revisar = Path.Combine(Carpeta, "revisar_modelos.txt");
+            if (File.Exists(revisar))
+            {
+                File.Delete(revisar);
+                EscribirEstado("fotografiando modelos");
+                RevisarModelos3D.Fotografiar();
+                return;
+            }
+
             string paquete = Path.Combine(Carpeta, "paquete.txt");
             if (File.Exists(paquete))
             {

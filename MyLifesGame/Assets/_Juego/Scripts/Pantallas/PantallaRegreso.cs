@@ -17,13 +17,15 @@ public class PantallaRegreso : Pantalla
     private readonly bool[] elegidas = new bool[6];
     private readonly int[] minutos = new int[6];
 
-    public PantallaRegreso(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla regreso")
+    public PantallaRegreso(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla regreso", -1, true)
     {
+        ComoHoja(0.6f, 0.08f);
         banner = TextoEnFila("", 80, 46, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
         TextoEnFila("Tranquilo, no pierdes nada: tus barras estaban en pausa.", 46, 28, Paleta.TextoSuave, TextAnchor.MiddleCenter);
 
         RectTransform filaAvatar = UIFabrica.Fila(columna, "Avatar", 440);
         avatar = new AvatarDibujo(filaAvatar);
+        filaAvatar.gameObject.SetActive(false); // el avatar se ve en la ciudad, detrás de la hoja
         Image globo = UIFabrica.Caja(filaAvatar, "Globo", Paleta.Blanco);
         UIFabrica.Anclar(globo.rectTransform, 0.6f, 0.66f, 0.97f, 0.93f);
         UIFabrica.Sombra(globo, 4f, 0.12f);

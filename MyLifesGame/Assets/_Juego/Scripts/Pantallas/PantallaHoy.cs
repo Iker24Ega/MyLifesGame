@@ -22,12 +22,22 @@ public class PantallaHoy : Pantalla
     private readonly Text[] premiosMision = new Text[4];
     private readonly RectTransform[] filasMision = new RectTransform[4];
 
-    public PantallaHoy(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla Hoy", 1)
+    public PantallaHoy(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla Hoy", 1, true)
     {
-        // Reloj y velocidad del tiempo
+        // Como en la imagen de referencia: la ciudad 3D se ve arriba y el contenido va en una hoja clara debajo.
+        Image hoja = UIFabrica.Caja(raizRT, "Hoja", new Color(Paleta.Fondo.r, Paleta.Fondo.g, Paleta.Fondo.b, 0.97f));
+        hoja.raycastTarget = true;
+        UIFabrica.Anclar(hoja.rectTransform, 0, 0, 1, 0.75f);
+        UIFabrica.Sombra(hoja, 12f, 0.18f);
+        hoja.transform.SetSiblingIndex(0);
+
+        // Reloj (pastilla sobre la ciudad) y velocidad del tiempo
         RectTransform cabecera = UIFabrica.Fila(columna, "Cabecera", 100);
-        reloj = UIFabrica.Texto(cabecera, "", 54, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
-        UIFabrica.Anclar(reloj.rectTransform, 0, 0, 0.5f, 1);
+        Image pastilla = UIFabrica.Caja(cabecera, "Pastilla fecha", Paleta.Tarjeta);
+        UIFabrica.Anclar(pastilla.rectTransform, 0, 0.08f, 0.48f, 0.92f);
+        UIFabrica.Sombra(pastilla, 6f, 0.18f);
+        reloj = UIFabrica.Texto(pastilla.transform, "", 44, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(reloj.rectTransform, 0, 0, 1, 1);
         for (int i = 0; i < 3; i++)
         {
             int indice = i;
@@ -35,6 +45,8 @@ public class PantallaHoy : Pantalla
                 () => this.juego.Velocidad = Velocidades[indice]);
             UIFabrica.Anclar((RectTransform)botonesVelocidad[i].transform, 0.52f + 0.16f * i, 0.12f, 0.66f + 0.16f * i, 0.88f);
         }
+
+        UIFabrica.Fila(columna, "Ventana a la ciudad", 260);
 
         // Tarjeta de pasos con anillo
         RectTransform filaPasos = UIFabrica.Fila(columna, "Pasos", 290);
@@ -70,7 +82,7 @@ public class PantallaHoy : Pantalla
         tituloMisiones = TextoEnFila("Misiones de hoy", 50, 38, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
         for (int i = 0; i < 4; i++)
         {
-            filasMision[i] = UIFabrica.Fila(columna, "Misión " + i, 104);
+            filasMision[i] = UIFabrica.Fila(columna, "Misión " + i, 92);
             Image t = Tarjeta(filasMision[i]);
             franjasMision[i] = UIFabrica.Caja(t.transform, "Franja", Paleta.Gris, false);
             UIFabrica.Anclar(franjasMision[i].rectTransform, 0, 0.1f, 0.014f, 0.9f);
@@ -106,7 +118,7 @@ public class PantallaHoy : Pantalla
         UIFabrica.Anclar((RectTransform)dormir.transform, 0.63f, 0f, 1f, 1f);
 
         // Registro
-        RectTransform filaRegistro = UIFabrica.Fila(columna, "Registro", 150);
+        RectTransform filaRegistro = UIFabrica.Fila(columna, "Registro", 96);
         Image fondoRegistro = Tarjeta(filaRegistro);
         registro = UIFabrica.Texto(fondoRegistro.transform, "", 22, Paleta.Texto, TextAnchor.UpperLeft);
         UIFabrica.Anclar(registro.rectTransform, 0.03f, 0.04f, 0.97f, 0.96f);

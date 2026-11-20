@@ -1,4 +1,6 @@
-<!-- Evita que la compilación web elimine clases que se crean por código (colisionadores de las primitivas). -->
+<!-- Evita que la compilación web elimine clases que se crean por código (colisionadores de las primitivas, animaciones del avatar). -->
 <linker>
   <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
+  <assembly fullname="UnityEngine.AnimationModule" preserve="all"/>
+  <assembly fullname="UnityEngine.DirectorModule" preserve="all"/>
 </linker>

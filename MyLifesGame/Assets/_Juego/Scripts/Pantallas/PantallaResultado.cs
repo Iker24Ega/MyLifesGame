@@ -23,13 +23,18 @@ public class PantallaResultado : Pantalla
     private ResultadoAccion resultado;
     private int valoracionPendiente;
 
-    public PantallaResultado(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla resultado")
+    private readonly RawImage escena;
+
+    public PantallaResultado(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla resultado", -1, true)
     {
-        TextoEnFila("Acción terminada", 100, 66, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        // Como la imagen de referencia: el avatar celebra en la sala de la acción y los resultados van en una hoja
+        ComoHoja(0.68f, 0f);
+        escena = FondoEscena();
+        TextoEnFila("¡Sesión terminada!", 84, 60, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
         subtitulo = TextoEnFila("", 50, 38, Paleta.TextoSuave, TextAnchor.MiddleCenter);
         tramo = TextoEnFila("", 50, 38, Paleta.Verde, TextAnchor.MiddleCenter, FontStyle.Bold);
 
-        RectTransform filaTarjeta = UIFabrica.Fila(columna, "Cambios", 470);
+        RectTransform filaTarjeta = UIFabrica.Fila(columna, "Cambios", 430);
         Image tarjeta = Tarjeta(filaTarjeta);
         RectTransform col = UIFabrica.Columna(tarjeta.transform, "Columna", 26, 6);
         foreach (Area area in Areas.Todas)
@@ -56,7 +61,7 @@ public class PantallaResultado : Pantalla
         }
 
         recompensas = TextoEnFila("", 50, 34, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        notas = TextoEnFila("", 230, 28, Paleta.Texto, TextAnchor.UpperLeft);
+        notas = TextoEnFila("", 130, 26, Paleta.Texto, TextAnchor.UpperLeft);
 
         // Minipregunta (9.1)
         pregunta = TextoEnFila("¿Qué tal ha ido?", 46, 32, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -107,6 +112,9 @@ public class PantallaResultado : Pantalla
             antes[i] = Mathf.Clamp(despues[i] - r.cambios[i], 0f, 100f);
         }
         inicioAnimacion = Time.unscaledTime;
+        AjustarFondoEscena(escena);
+        EstudioAvatar.PonerEscena(r.accion.id, -3.9f, 1.25f);
+        EstudioAvatar.PonerAccion("celebrar");
         if (r.tramo == TramoDosis.ZonaOptima) { confeti.Lanzar(); Sonidos.Exito(); }
         else Sonidos.Fin();
         if (r.monedas > 0) { monedasVolando.Lanzar(new Vector2(0.15f, -0.05f), new Vector2(0.8f, 1.75f)); Sonidos.Moneda(); }

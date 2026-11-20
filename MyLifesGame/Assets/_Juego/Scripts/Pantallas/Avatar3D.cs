@@ -323,7 +323,7 @@ public class Avatar3D : MonoBehaviour
 
         if (Caminando) Reproducir("Walk", 0.2f, 1.15f);
         else if (a == "pasear") Reproducir("Walk", 0.25f, 0.9f);
-        else if (a == "quedar") Reproducir("Idle", 0.3f);
+        else if (a == "quedar" || a == "estirarse" || a == "celebrar") Reproducir("Idle", 0.3f);
         else if (a == "entrenar" || EsSentado(a) || a == "meditar") Reproducir("Idle_Neutral", 0.3f);
         else if (estadoAvatar == TipoEstadoAvatar.Cansado || estadoAvatar == TipoEstadoAvatar.Descuidado) Reproducir("Idle_Neutral", 0.4f, 0.7f);
         else Reproducir("Idle", 0.4f);
@@ -362,6 +362,16 @@ public class Avatar3D : MonoBehaviour
             if (estadoAvatar == TipoEstadoAvatar.Cansado) { Girar(pecho, X, 8f); Girar(cabeza, X, 10f); }
             else if (estadoAvatar == TipoEstadoAvatar.Descuidado) { Girar(pecho, X, 14f); Girar(cabeza, X, 16f); }
             else if (estadoAvatar == TipoEstadoAvatar.EnForma && !Caminando) { Girar(pecho, X, -4f); Girar(cabeza, X, -4f); }
+        }
+        else if (a == "estirarse" || a == "celebrar")
+        {
+            float c = a == "celebrar" ? Mathf.Abs(Mathf.Sin(t * 5f)) : (Mathf.Sin(t * 1.4f) + 1f) * 0.5f;
+            float alto = a == "celebrar" ? 150f + c * 15f : 135f + c * 30f;
+            Girar(brazoI, Z, -alto); Girar(brazoD, Z, alto);
+            Girar(codoI, Z, -10f); Girar(codoD, Z, 10f);
+            Girar(cabeza, X, -10f);
+            if (a == "celebrar") modelo.localPosition += new Vector3(0, c * 0.12f * Altura, 0);
+            else Girar(pecho, X, -6f * c);
         }
         else if (a == "entrenar")
         {

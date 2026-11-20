@@ -101,9 +101,11 @@ public static class EstudioAvatar
     }
 
     /// <summary>Monta la sala de la acción (gimnasio, biblioteca...) y enciende la cámara de escena.</summary>
-    public static void PonerEscena(string accion)
+    public static void PonerEscena(string accion, float mirada = 2.1f, float distancia = 1f)
     {
         Preparar(); PrepararEscena();
+        camEscena.transform.position = Lugar + new Vector3(8.5f, 8.2f, 15.5f) * distancia;
+        camEscena.transform.LookAt(Lugar + new Vector3(-0.8f, mirada, 0.2f));
         string sala = Salas3D.SalaDe(accion);
         if (sala != salaActual || accion != accionSala)
         {

@@ -17,6 +17,8 @@ public static class Salas3D
             case "trabajar": return "oficina";
             case "quedar": return "cafeteria";
             case "pasear": return "parque";
+            case "checkin": return "dormitorio";
+            case "avatar": return "vestidor";
             default: return "salon";   // descansar, meditar, videojuegos
         }
     }
@@ -33,6 +35,8 @@ public static class Salas3D
             case "oficina": Oficina(); break;
             case "cafeteria": Cafeteria(); break;
             case "parque": Parque(); break;
+            case "dormitorio": Dormitorio(); break;
+            case "vestidor": Vestidor(); break;
             default: Salon(accion); break;
         }
     }
@@ -227,6 +231,34 @@ public static class Salas3D
         }
         Mueble("lampRoundFloor", new Vector3(-6.8f, 0, -1.8f), 0.9f, 0f);
         Planta(new Vector3(7.4f, 0, -2.4f), 1.3f);
+    }
+
+    private static void Dormitorio()
+    {
+        Habitacion(Paleta.Hex("F3E4D2"), Paleta.Hex("D6AB7E"), Paleta.Hex("B98B5E"));
+        Ventana(new Vector3(-3.6f, 4.4f, -3.25f), 3.8f, 3.0f);
+        Mueble("bedSingle", new Vector3(4.6f, 0, -1.4f), 3.0f, 0f);
+        Mueble("cabinetBed", new Vector3(2.4f, 0, -2.6f), 1.1f, 0f);
+        Mueble("lampSquareTable", new Vector3(2.4f, 1.05f, -2.6f), 0.6f, 0f);
+        Mueble("rugRound", new Vector3(0, 0.01f, 0.4f), 3.6f, 0f);
+        Planta(new Vector3(-7f, 0, -2.3f), 1.2f);
+        // Mochila apoyada en la pared
+        Caja(PrimitiveType.Cube, "Mochila", new Vector3(-1.6f, 0.75f, -2.9f), new Vector3(1.0f, 1.4f, 0.55f), Paleta.Mochila, 0, true);
+        Caja(PrimitiveType.Cube, "Bolsillo", new Vector3(-1.6f, 0.5f, -2.58f), new Vector3(0.7f, 0.5f, 0.12f), Paleta.Hex("3A3E45"));
+        Cuadro(new Vector3(4.6f, 4.6f, -3.25f), 1.8f, 1.2f, Paleta.Hex("9FC7E8"));
+    }
+
+    private static void Vestidor()
+    {
+        Habitacion(Paleta.Hex("F4E3CF"), Paleta.Hex("D9B48A"), Paleta.Hex("C79A6C"));
+        Ventana(new Vector3(-4.2f, 4.3f, -3.25f), 3.4f, 3.0f);
+        Caja(PrimitiveType.Cylinder, "Pedestal", new Vector3(0, -0.02f, 0.2f), new Vector3(3.6f, 0.06f, 3.6f), Paleta.Hex("EADBC8"), 0, true);
+        Caja(PrimitiveType.Cylinder, "Borde pedestal", new Vector3(0, -0.04f, 0.2f), new Vector3(3.9f, 0.05f, 3.9f), Paleta.Hex("D8C3A8"));
+        Mueble("lampRoundFloor", new Vector3(4.2f, 0, -2.2f), 1.0f, 0f);
+        Mueble("sideTable", new Vector3(-6.2f, 0, -2.2f), 1.4f, 0f);
+        Planta(new Vector3(6.8f, 0, -2.4f), 1.4f);
+        Mueble("plantSmall1", new Vector3(-6.2f, 1.0f, -2.2f), 0.7f, 0f);
+        Cuadro(new Vector3(2.2f, 4.8f, -3.25f), 1.6f, 1.1f, Paleta.Hex("F6B49F"));
     }
 
     private static void Parque()

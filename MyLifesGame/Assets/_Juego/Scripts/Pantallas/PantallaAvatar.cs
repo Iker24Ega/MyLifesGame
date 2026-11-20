@@ -14,8 +14,16 @@ public class PantallaAvatar : Pantalla
     private readonly Text[] textosPrenda = new Text[6];
     private readonly Button botonPantallas, botonSonido;
 
+    private readonly RawImage escena;
+
     public PantallaAvatar(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla avatar", 3)
     {
+        // Como la imagen de referencia: el avatar sobre un pedestal en su habitación 3D y la tienda en una hoja debajo
+        Image hoja = UIFabrica.Caja(raizRT, "Hoja", Paleta.Fondo);
+        UIFabrica.Anclar(hoja.rectTransform, 0, 0, 1, 0.6f);
+        UIFabrica.Sombra(hoja, 12f, 0.2f);
+        hoja.transform.SetAsFirstSibling();
+        escena = FondoEscena();
         // Cabecera: nivel, barra de XP y monedas
         RectTransform cab = UIFabrica.Fila(columna, "Cabecera", 96);
         Image pildoraNivel = UIFabrica.Caja(cab, "Nivel", Paleta.Coral);
@@ -41,6 +49,7 @@ public class PantallaAvatar : Pantalla
 
         RectTransform filaAvatar = UIFabrica.Fila(columna, "Avatar", 560);
         avatar = new AvatarDibujo(filaAvatar);
+        for (int i = 0; i < filaAvatar.childCount; i++) filaAvatar.GetChild(i).gameObject.SetActive(false);
         estado = TextoEnFila("", 64, 30, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
 
         TextoEnFila("Tienda de sudaderas", 54, 36, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -108,6 +117,8 @@ public class PantallaAvatar : Pantalla
         string causa;
         TipoEstadoAvatar tipo = EstadoAvatar.Calcular(juego.Jornada.Estado, juego.VieneDeAusencia, out causa);
         avatar.Actualizar(tipo, Catalogos.BuscarPrenda(pr.Datos.ropaPuesta).colorHex);
+        AjustarFondoEscena(escena);
+        EstudioAvatar.PonerEscena("avatar", -2.6f, 1.1f);
         estado.text = "<color=#" + ColorUtility.ToHtmlStringRGB(ColorEstado(tipo)) + ">" + EstadoAvatar.Nombre(tipo) + "</color>   <size=26><color=#8A7565>" + causa + "</color></size>";
 
         for (int i = 0; i < Catalogos.Prendas.Length && i < 6; i++)

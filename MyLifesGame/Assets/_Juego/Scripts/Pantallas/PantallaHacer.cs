@@ -11,8 +11,9 @@ public class PantallaHacer : Pantalla
     private readonly Button botonAmigos, botonEmpezar;
     private DefinicionAccion elegida;
 
-    public PantallaHacer(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla Hacer")
+    public PantallaHacer(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla Hacer", -1, true)
     {
+        ComoHoja(0.93f);
         RectTransform cabecera = UIFabrica.Fila(columna, "Cabecera", 100);
         Text titulo = UIFabrica.Texto(cabecera, "¿Qué vas a hacer?", 60, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
         UIFabrica.Anclar(titulo.rectTransform, 0, 0, 0.85f, 1);

@@ -18,27 +18,25 @@ public class PantallaCheckIn : Pantalla
     private readonly List<Area> focos = new List<Area>();
     private bool arrastro;
 
-    public PantallaCheckIn(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla check-in")
-    {
-        RectTransform cab = UIFabrica.Fila(columna, "Cabecera", 170);
-        titulo = UIFabrica.Texto(cab, "Buenos días", 66, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
-        UIFabrica.Anclar(titulo.rectTransform, 0, 0.4f, 0.8f, 1);
-        Text sub = UIFabrica.Texto(cab, "Cuéntame cómo empiezas el día. Son unos toques.", 30, Paleta.TextoSuave);
-        UIFabrica.Anclar(sub.rectTransform, 0, 0, 0.8f, 0.4f);
-        RectTransform zonaSol = UIFabrica.Crear("Sol", cab);
-        zonaSol.anchorMin = zonaSol.anchorMax = new Vector2(1, 0.5f);
-        zonaSol.sizeDelta = new Vector2(150, 150);
-        zonaSol.anchoredPosition = new Vector2(-75, 0);
-        FormasUI sol = FormasUI.En(zonaSol.gameObject);
-        sol.raycastTarget = false;
-        Iconos.Sol(sol);
+    private readonly RawImage escena;
 
-        TextoEnFila("¿Cómo has dormido?", 60, 38, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
+    public PantallaCheckIn(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla check-in", -1, true)
+    {
+        // Como la imagen de referencia: dormitorio 3D con el avatar estirándose y las preguntas en una hoja
+        ComoHoja(0.64f, 0f);
+        escena = FondoEscena();
+        RectTransform cab = UIFabrica.Fila(columna, "Cabecera", 110);
+        titulo = UIFabrica.Texto(cab, "Buenos días", 58, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(titulo.rectTransform, 0, 0.36f, 1, 1);
+        Text sub = UIFabrica.Texto(cab, "Cuéntame cómo empiezas el día", 30, Paleta.TextoSuave, TextAnchor.MiddleCenter);
+        UIFabrica.Anclar(sub.rectTransform, 0, 0, 1, 0.38f);
+
+        TextoEnFila("¿Cómo has dormido?", 46, 34, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
         FilaOpciones(Sueno, botonesSueno, 0, i => { sueno = i; Actualizar(); });
-        TextoEnFila("¿Cómo te sientes?", 60, 38, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
+        TextoEnFila("¿Cómo te sientes?", 46, 34, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
         FilaOpciones(Sentir, botonesSentir, 1, i => { sentir = i; Actualizar(); });
 
-        TextoEnFila("¿Qué quieres cuidar hoy? (hasta 2)", 60, 38, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
+        TextoEnFila("¿Qué quieres cuidar hoy? (hasta 2)", 46, 34, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
         var nombres = new string[5];
         foreach (Area a in Areas.Todas) nombres[(int)a] = Areas.Nombre(a);
         FilaOpciones(nombres, botonesFoco, 2, i =>
@@ -49,18 +47,17 @@ public class PantallaCheckIn : Pantalla
             Actualizar();
         });
 
-        TextoEnFila("¿Vienes arrastrando algo? (opcional)", 60, 38, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
-        botonArrastro = BotonEnFila("", 90, Paleta.Gris, Paleta.Texto, 30, () => { arrastro = !arrastro; Actualizar(); });
+        botonArrastro = BotonEnFila("", 66, Paleta.Gris, Paleta.Texto, 30, () => { arrastro = !arrastro; Actualizar(); });
 
         UIFabrica.Relleno(columna);
-        BotonEnFila("Empezar el día", 140, Paleta.Coral, Paleta.Blanco, 52, () => this.juego.CompletarCheckIn(sueno, sentir, focos, arrastro));
-        BotonEnFila("Saltar por hoy", 90, Paleta.Gris, Paleta.Texto, 32, () => this.juego.CompletarCheckIn(3, 2, new List<Area>(), false));
+        BotonEnFila("Empezar el día", 118, Paleta.Coral, Paleta.Blanco, 52, () => this.juego.CompletarCheckIn(sueno, sentir, focos, arrastro));
+        BotonEnFila("Saltar por hoy", 64, Paleta.Gris, Paleta.Texto, 32, () => this.juego.CompletarCheckIn(3, 2, new List<Area>(), false));
     }
 
     /// <summary>Fila de cinco tarjetas con dibujo (tipo 0: caritas dormidas, 1: caritas, 2: iconos de área) y texto debajo.</summary>
     private void FilaOpciones(string[] textos, Button[] botones, int tipo, System.Action<int> alElegir)
     {
-        RectTransform fila = UIFabrica.Fila(columna, "Opciones", 170);
+        RectTransform fila = UIFabrica.Fila(columna, "Opciones", 126);
         for (int i = 0; i < textos.Length; i++)
         {
             int indice = i;
@@ -70,7 +67,7 @@ public class PantallaCheckIn : Pantalla
             UIFabrica.Anclar(t.rectTransform, 0.02f, 0.02f, 0.98f, 0.32f);
             RectTransform z = UIFabrica.Crear("Dibujo", botones[i].transform);
             z.anchorMin = z.anchorMax = new Vector2(0.5f, 0.64f);
-            z.sizeDelta = new Vector2(86, 86);
+            z.sizeDelta = new Vector2(70, 70);
             FormasUI f = FormasUI.En(z.gameObject);
             f.raycastTarget = false;
             if (tipo == 2) Iconos.Dibujar(f, (Area)i, true);
@@ -84,6 +81,9 @@ public class PantallaCheckIn : Pantalla
     protected override void AlMostrar()
     {
         sueno = 3; sentir = 3; focos.Clear(); arrastro = false;
+        AjustarFondoEscena(escena);
+        EstudioAvatar.PonerEscena("checkin", -3.8f, 1.2f);
+        EstudioAvatar.PonerAccion("estirarse");
         titulo.text = "Buenos días · Día " + juego.Dia;
     }
 

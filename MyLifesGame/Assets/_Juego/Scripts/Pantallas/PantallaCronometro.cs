@@ -20,12 +20,7 @@ public class PantallaCronometro : Pantalla
     public PantallaCronometro(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla cronómetro")
     {
         // Sala 3D a pantalla completa, detrás de todo
-        escena = new GameObject("Sala 3D", typeof(RectTransform)).AddComponent<RawImage>();
-        escena.transform.SetParent(raizRT, false);
-        escena.transform.SetAsFirstSibling();
-        escena.texture = EstudioAvatar.TexturaEscena;
-        escena.raycastTarget = false;
-        UIFabrica.Anclar(escena.rectTransform, 0, 0, 1, 1);
+        escena = FondoEscena();
 
         // Tarjeta superior: anillo pequeño + qué haces + tiempo + lugar
         RectTransform filaTiempo = UIFabrica.Fila(columna, "Tiempo", 250);

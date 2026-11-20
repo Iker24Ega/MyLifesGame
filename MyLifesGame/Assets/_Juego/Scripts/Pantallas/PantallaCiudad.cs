@@ -194,7 +194,7 @@ public class PantallaCiudad : Pantalla
         Progreso pr = juego.Progreso;
         pildoraZoom.gameObject.SetActive(!HojaAbierta && !GuiaVisible);
         // El personaje generado tiene la cabeza a tamaño normal (no chibi): se encuadra más arriba y más cerca
-        if (cara != null) cara.uvRect = Avatar3D.UsaGenerado ? new Rect(0.35f, 0.7f, 0.3f, 0.26f) : new Rect(0.22f, 0.5f, 0.56f, 0.45f);
+        if (cara != null) cara.uvRect = Avatar3D.UsaGenerado ? EstudioAvatar.RecorteCara() : new Rect(0.22f, 0.5f, 0.56f, 0.45f);
         nivel.text = "Nv. " + pr.Nivel;
         if (pr.Nivel != nivelBarrios) { nivelBarrios = pr.Nivel; juego.Ciudad.ActualizarBarrios(pr.Nivel); }
         barraXp.fillAmount = pr.XpEnNivel / (float)Progreso.XpPorNivel;

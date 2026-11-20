@@ -23,6 +23,7 @@ public class Avatar3D : MonoBehaviour
     private float EscalaBrazos = 0.9f;
     /// <summary>true si usa el personaje generado (Flow → TRELLIS → Mixamo) en lugar del de Quaternius.</summary>
     public bool Generado { get; private set; }
+    public Transform Cabeza { get { return cabeza; } }
     /// <summary>true si el último avatar creado usa el personaje generado (para encuadrar los retratos).</summary>
     public static bool UsaGenerado { get; private set; }
     private float caida;
@@ -113,16 +114,6 @@ public class Avatar3D : MonoBehaviour
         GameObject prefab = Resources.Load<GameObject>("Modelos3D/personaje/personaje_rig");
         if (prefab == null) return false;
         Animator anim = prefab.GetComponentInChildren<Animator>();
-#if UNITY_EDITOR
-        try
-        {
-            System.IO.File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "..", "Automatizacion", "diag_generado.txt"),
-                "animator=" + (anim != null) + " avatar=" + (anim != null && anim.avatar != null) +
-                (anim != null && anim.avatar != null ? " humano=" + anim.avatar.isHuman + " valido=" + anim.avatar.isValid : "") +
-                " hijos=" + prefab.transform.childCount + "\n");
-        }
-        catch (System.Exception) { }
-#endif
         if (anim == null || anim.avatar == null || !anim.avatar.isHuman || !anim.avatar.isValid) return false;
 
         GameObject go = Instantiate(prefab, transform, false);
@@ -191,6 +182,13 @@ public class Avatar3D : MonoBehaviour
     private void MedirMalla(GameObject go, out float min, out float max)
     {
         min = float.MaxValue; max = float.MinValue;
+        // Primero los huesos (fiable en cualquier plataforma): de los pies a la cabeza ≈ 86 % de la altura
+        if (cabeza != null && pieI != null)
+        {
+            float pies = transform.InverseTransformPoint(pieI.position).y;
+            float altoH = (transform.InverseTransformPoint(cabeza.position).y - pies) / 0.86f;
+            if (altoH > 0.01f) { min = pies - altoH * 0.04f; max = min + altoH; return; }
+        }
         foreach (SkinnedMeshRenderer smr in go.GetComponentsInChildren<SkinnedMeshRenderer>())
         {
             if (smr.sharedMesh == null) continue;
@@ -213,6 +211,30 @@ public class Avatar3D : MonoBehaviour
             }
             else { min = 0f; max = Altura; }
         }
+    }
+
+    private int calibrado;
+
+    /// <summary>
+    /// Ajuste fino con la animación ya aplicada (la pose de reposo del FBX no siempre mide lo mismo):
+    /// la base del cráneo queda al 87 % de la altura y los tobillos apoyados en el suelo.
+    /// </summary>
+    private void Calibrar()
+    {
+        if (cabeza == null || pieI == null || pieD == null) { calibrado = 3; return; }
+        calibrado++;
+        modelo.localPosition = new Vector3(0, caida, 0);
+        float pies = Mathf.Min(transform.InverseTransformPoint(pieI.position).y, transform.InverseTransformPoint(pieD.position).y);
+        float altoCabeza = transform.InverseTransformPoint(cabeza.position).y - pies;
+        if (altoCabeza < 0.01f) return;
+        float k = (0.83f * Altura) / altoCabeza;
+        escala *= k;
+        modelo.localScale = Vector3.one * escala;
+        pies = Mathf.Min(transform.InverseTransformPoint(pieI.position).y, transform.InverseTransformPoint(pieD.position).y);
+        caida += 0.045f * Altura - pies;
+        modelo.localPosition = new Vector3(0, caida, 0);
+        alturaTobillo = 0.045f * Altura;
+        GuardarPies();
     }
 
     private Transform H(HumanBodyBones b) { return animador != null ? animador.GetBoneTransform(b) : null; }
@@ -496,6 +518,7 @@ public class Avatar3D : MonoBehaviour
         if (modelo == null) return;
         float t = Time.time;
         if (cabeza != null) cabeza.localScale = Vector3.one * EscalaCabeza;
+        if (Generado && calibrado < 3) Calibrar();
         modelo.localPosition = new Vector3(0, caida, 0);
         EscalarExtremidades(1f, 1f);
         GuardarPies();

@@ -64,6 +64,17 @@ public static class EstudioAvatar
     }
 
     /// <summary>Textura panorámica con la sala 3D y el avatar haciendo la acción (cronómetro).</summary>
+    /// <summary>Recorte de la textura del retrato centrado en la cara del avatar (para retratos redondos).</summary>
+    public static Rect RecorteCara(float ancho = 0.3f)
+    {
+        Preparar();
+        Transform cabeza = avatar != null ? avatar.Cabeza : null;
+        if (cabeza == null || camara == null) return new Rect(0.22f, 0.5f, 0.56f, 0.45f);
+        Vector3 v = camara.WorldToViewportPoint(cabeza.position + Vector3.up * (0.05f * Avatar3D.Altura));
+        float alto = ancho * textura.width / (float)textura.height;
+        return new Rect(v.x - ancho * 0.5f, v.y - alto * 0.5f, ancho, alto);
+    }
+
     public static RenderTexture TexturaEscena
     {
         get { Preparar(); PrepararEscena(); return texEscena; }

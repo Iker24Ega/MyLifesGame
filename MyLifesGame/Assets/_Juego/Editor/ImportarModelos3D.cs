@@ -83,6 +83,9 @@ public class ImportarModelos3D : AssetPostprocessor
         return File.Exists(salida) ? "exportado " + salida : "falló la exportación";
     }
 
+    // Subir el número fuerza a Unity a reimportar estos modelos con los ajustes nuevos
+    public override uint GetVersion() { return 2; }
+
     private bool EsNuestro { get { return assetPath.Replace('\\', '/').StartsWith(Destino + "/"); } }
 
     private void OnPreprocessModel()
@@ -94,7 +97,7 @@ public class ImportarModelos3D : AssetPostprocessor
         m.globalScale = 1f;
         m.importCameras = false;
         m.importLights = false;
-        m.isReadable = false;
+        m.isReadable = personaje; // el avatar mide su malla al crearse (en la versión web hace falta poder leerla)
         m.meshCompression = ModelImporterMeshCompression.Medium; // la web pesa menos
         m.importNormals = ModelImporterNormals.Import;
         m.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;

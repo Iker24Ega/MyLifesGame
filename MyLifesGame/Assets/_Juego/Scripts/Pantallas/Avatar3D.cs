@@ -202,7 +202,17 @@ public class Avatar3D : MonoBehaviour
                 if (y > max) max = y;
             }
         }
-        if (min > max) { min = 0f; max = Altura; }
+        if (min > max)
+        {
+            // Malla no legible: se estima con los huesos (pies → cabeza ≈ 86 % de la altura)
+            if (cabeza != null && pieI != null)
+            {
+                float pies = transform.InverseTransformPoint(pieI.position).y;
+                float alto = (transform.InverseTransformPoint(cabeza.position).y - pies) / 0.86f;
+                min = pies - alto * 0.04f; max = min + alto;
+            }
+            else { min = 0f; max = Altura; }
+        }
     }
 
     private Transform H(HumanBodyBones b) { return animador != null ? animador.GetBoneTransform(b) : null; }

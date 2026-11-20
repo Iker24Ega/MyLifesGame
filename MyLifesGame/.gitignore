@@ -112,3 +112,6 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Versión web compilada (se genera con Automatizacion/build_web.txt)
+/[Bb]uildWeb/

@@ -56,6 +56,14 @@ public static class AutomatizacionClaude
                 return;
             }
 
+            string web = Path.Combine(Carpeta, "build_web.txt");
+            if (File.Exists(web))
+            {
+                File.Delete(web);
+                CompilarWeb();
+                return;
+            }
+
             AssetDatabase.Refresh();
             EscribirEstado("refresco");
         }
@@ -63,6 +71,31 @@ public static class AutomatizacionClaude
         {
             Debug.LogWarning("[Automatización] " + e.Message);
         }
+    }
+
+    /// <summary>
+    /// Versión web (WebGL) para probar en el móvil. Sale en la carpeta BuildWeb/ junto al proyecto (no se sube a git).
+    /// Usa compresión Gzip con descompresión de respaldo, para que funcione en cualquier alojamiento estático.
+    /// </summary>
+    [MenuItem("My Life's Game/Compilar versión web")]
+    public static void CompilarWeb()
+    {
+        string salida = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "BuildWeb"));
+        EscribirEstado("compilando web");
+        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+        PlayerSettings.WebGL.decompressionFallback = true;
+        PlayerSettings.productName = "My Life's Game";
+        var opciones = new BuildPlayerOptions
+        {
+            scenes = new[] { "Assets/Scenes/SampleScene.unity" },
+            locationPathName = salida,
+            target = BuildTarget.WebGL,
+            options = BuildOptions.None
+        };
+        var informe = BuildPipeline.BuildPlayer(opciones);
+        string resumen = informe.summary.result + " | " + (informe.summary.totalSize / (1024 * 1024)) + " MB | " + informe.summary.totalTime;
+        File.WriteAllText(Path.Combine(Carpeta, "build_web_resultado.txt"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " | " + resumen + "\n");
+        EscribirEstado("web terminada: " + informe.summary.result);
     }
 
     private static void EscribirEstado(string evento)

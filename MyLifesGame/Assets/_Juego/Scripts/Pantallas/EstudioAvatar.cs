@@ -62,6 +62,7 @@ public static class EstudioAvatar
         avatar.Accion = id ?? "";
     }
 
+
     public static void Actualizar(TipoEstadoAvatar estado, string colorSudadera)
     {
         Preparar();

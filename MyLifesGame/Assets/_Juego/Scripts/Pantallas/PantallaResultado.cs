@@ -17,6 +17,7 @@ public class PantallaResultado : Pantalla
     private readonly float[] antes = new float[5], despues = new float[5];
     private float inicioAnimacion;
     private readonly Confeti confeti;
+    private readonly MonedasVolando monedasVolando;
     private readonly RectTransform filaValoracion, filaMotivos;
     private readonly Button[] botonesMotivo = new Button[5];
     private ResultadoAccion resultado;
@@ -78,6 +79,7 @@ public class PantallaResultado : Pantalla
         UIFabrica.Relleno(columna);
         BotonEnFila("Continuar", 130, Paleta.Verde, Paleta.Blanco, 52, () => this.juego.IrAPestana(0));
         confeti = Confeti.Crear(raizRT);
+        monedasVolando = MonedasVolando.Crear(raizRT);
     }
 
     public override void Actualizar()
@@ -107,6 +109,7 @@ public class PantallaResultado : Pantalla
         inicioAnimacion = Time.unscaledTime;
         if (r.tramo == TramoDosis.ZonaOptima) { confeti.Lanzar(); Sonidos.Exito(); }
         else Sonidos.Fin();
+        if (r.monedas > 0) { monedasVolando.Lanzar(new Vector2(0.15f, -0.05f), new Vector2(0.8f, 1.75f)); Sonidos.Moneda(); }
         subtitulo.text = r.accion.nombre + " · " + Jornada.Duracion(r.minutos);
         switch (r.tramo)
         {

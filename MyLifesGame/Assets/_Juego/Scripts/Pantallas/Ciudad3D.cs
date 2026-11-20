@@ -110,6 +110,7 @@ public class Ciudad3D : MonoBehaviour
         }
 
         Barrio();
+        BarriosBloqueados();
         CrearAvatar();
         avatar.position = solares[datos.edificioActual].Puerta;
         ActualizarTodos();
@@ -490,7 +491,7 @@ public class Ciudad3D : MonoBehaviour
     private void SituarCamara(bool instantaneo)
     {
         if (camara == null || avatar == null) return;
-        Vector3 objetivo = avatar.position + desplazamiento + Vector3.up * 1.6f;
+        Vector3 objetivo = avatar.position + desplazamiento + Vector3.up * 1.6f + Vector3.forward * 4.5f;
         Vector3 deseada = objetivo + new Vector3(0, 27f, -21f) * zoom;
         float k = instantaneo ? 1f : 1f - Mathf.Exp(-6f * Time.deltaTime);
         camara.transform.position = Vector3.Lerp(camara.transform.position, deseada, k);
@@ -663,5 +664,82 @@ public class Ciudad3D : MonoBehaviour
         if (marcaSolar == null) return;
         float k = 1f + Mathf.Sin(Time.time * 4f) * 0.04f;
         marcaSolar.localScale = new Vector3(11f * k, 0.01f, 11f * k);
+    }
+
+    // ---------------------------------------------------------------- barrios bloqueados
+
+    private static readonly Vector3[] CentrosBarrio = { new Vector3(46f, 0, 0), new Vector3(-46f, 0, 0), new Vector3(0, 0, 46f) };
+    public static readonly int[] NivelBarrio = { 3, 5, 8 };
+    private readonly List<Text> textosBarrio = new List<Text>();
+
+    private void BarriosBloqueados()
+    {
+        for (int b = 0; b < CentrosBarrio.Length; b++)
+        {
+            Vector3 c = CentrosBarrio[b];
+            bool vertical = b < 2;
+            Vector3 tam = vertical ? new Vector3(22f, 0.1f, 40f) : new Vector3(40f, 0.1f, 22f);
+            Transform raiz = new GameObject("Barrio bloqueado " + b).transform;
+            raiz.SetParent(transform, false);
+            Pieza(PrimitiveType.Cube, "Suelo", c + new Vector3(0, 0.0f, 0), tam, Paleta.Hex("C9D6B4"), raiz);
+            // Vallas alrededor
+            float hx = tam.x * 0.5f, hz = tam.z * 0.5f;
+            for (float x = -hx; x <= hx + 0.01f; x += 2.75f)
+            {
+                Poste(raiz, c + new Vector3(x, 0, -hz));
+                Poste(raiz, c + new Vector3(x, 0, hz));
+            }
+            for (float z = -hz + 2.5f; z < hz; z += 2.5f)
+            {
+                Poste(raiz, c + new Vector3(-hx, 0, z));
+                Poste(raiz, c + new Vector3(hx, 0, z));
+            }
+            Pieza(PrimitiveType.Cube, "Barandilla", c + new Vector3(0, 0.75f, -hz), new Vector3(tam.x, 0.12f, 0.12f), Paleta.Blanco, raiz);
+            Pieza(PrimitiveType.Cube, "Barandilla", c + new Vector3(0, 0.75f, hz), new Vector3(tam.x, 0.12f, 0.12f), Paleta.Blanco, raiz);
+            Pieza(PrimitiveType.Cube, "Barandilla", c + new Vector3(-hx, 0.75f, 0), new Vector3(0.12f, 0.12f, tam.z), Paleta.Blanco, raiz);
+            Pieza(PrimitiveType.Cube, "Barandilla", c + new Vector3(hx, 0.75f, 0), new Vector3(0.12f, 0.12f, tam.z), Paleta.Blanco, raiz);
+            // Grúa y conos de obra, para que parezca "en construcción"
+            Pieza(PrimitiveType.Cube, "Grúa", c + new Vector3(3f, 6f, 2f), new Vector3(0.6f, 12f, 0.6f), Paleta.Hex("E3B341"), raiz);
+            Pieza(PrimitiveType.Cube, "Pluma", c + new Vector3(0f, 11.8f, 2f), new Vector3(9f, 0.5f, 0.5f), Paleta.Hex("E3B341"), raiz);
+            for (int k = 0; k < 4; k++)
+                Pieza(PrimitiveType.Capsule, "Cono", c + new Vector3(-6f + k * 3.5f, 0.45f, -hz + 2.5f), new Vector3(0.5f, 0.45f, 0.5f), Paleta.Hex("F2A36B"), raiz);
+            // Cartel con candado y nivel
+            var go = new GameObject("Cartel barrio", typeof(RectTransform), typeof(Canvas));
+            go.transform.SetParent(raiz, false);
+            go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(420, 330);
+            rt.localScale = Vector3.one * 0.016f;
+            rt.position = c + new Vector3(0, 5f, 0);
+            Image fondo = UIFabrica.Caja(go.transform, "Fondo", Paleta.Tarjeta);
+            UIFabrica.Anclar(fondo.rectTransform, 0, 0, 1, 1);
+            UIFabrica.Sombra(fondo, 8f, 0.25f);
+            RectTransform zc = UIFabrica.Crear("Candado", fondo.transform);
+            zc.anchorMin = zc.anchorMax = new Vector2(0.5f, 0.66f);
+            zc.sizeDelta = new Vector2(150, 150);
+            Iconos.Medalla(FormasUI.En(zc.gameObject), Area.Fisico, false);
+            Text t = UIFabrica.Texto(fondo.transform, "", 46, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFabrica.Anclar(t.rectTransform, 0.04f, 0.04f, 0.96f, 0.38f);
+            textosBarrio.Add(t);
+            carteles.Add(rt);
+        }
+        ActualizarBarrios(1);
+    }
+
+    private void Poste(Transform raiz, Vector3 p)
+    {
+        Pieza(PrimitiveType.Cube, "Poste", p + new Vector3(0, 0.5f, 0), new Vector3(0.18f, 1f, 0.18f), Paleta.Blanco, raiz);
+    }
+
+    /// <summary>Actualiza los carteles de los barrios según el nivel del jugador.</summary>
+    public void ActualizarBarrios(int nivel)
+    {
+        for (int b = 0; b < textosBarrio.Count; b++)
+        {
+            int falta = NivelBarrio[b] - nivel;
+            textosBarrio[b].text = falta > 0
+                ? "Barrio nuevo\n<size=34><color=#8A7565>Se abre en el nivel " + NivelBarrio[b] + "</color></size>"
+                : "Barrio nuevo\n<size=34><color=#5BAA6B>¡Desbloqueado! Muy pronto</color></size>";
+        }
     }
 }

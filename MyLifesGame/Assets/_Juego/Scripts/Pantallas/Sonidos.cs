@@ -14,6 +14,7 @@ public static class Sonidos
     private static void Preparar()
     {
         if (fuente != null) return;
+        Activos = PlayerPrefs.GetInt("sonido", 1) == 1;
         var go = new GameObject("Sonidos");
         Object.DontDestroyOnLoad(go);
         fuente = go.AddComponent<AudioSource>();
@@ -58,6 +59,17 @@ public static class Sonidos
         fuente.pitch = tono;
         fuente.PlayOneShot(c);
     }
+
+    public static void Alternar()
+    {
+        Preparar();
+        Activos = !Activos;
+        PlayerPrefs.SetInt("sonido", Activos ? 1 : 0);
+        PlayerPrefs.Save();
+        if (Activos) Sonar(toque);
+    }
+
+    public static bool EstanActivos { get { Preparar(); return Activos; } }
 
     public static void Toque() { Preparar(); Sonar(toque, Random.Range(0.97f, 1.03f)); }
     public static void Aviso() { Preparar(); Sonar(aviso); }

@@ -12,7 +12,7 @@ public class PantallaAvatar : Pantalla
     private readonly AvatarDibujo avatar;
     private readonly Button[] botonesPrenda = new Button[6];
     private readonly Text[] textosPrenda = new Text[6];
-    private readonly Button botonPantallas;
+    private readonly Button botonPantallas, botonSonido;
 
     public PantallaAvatar(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla avatar", 3)
     {
@@ -72,12 +72,14 @@ public class PantallaAvatar : Pantalla
 
         // Ajustes de la demo
         RectTransform filaAjustes = UIFabrica.Fila(columna, "Ajustes demo", 80);
-        Button ausencia = UIFabrica.Boton(filaAjustes, "Simular 6 h fuera", Paleta.Gris, Paleta.Texto, 26, () => this.juego.SimularAusencia(6 * 60));
-        botonPantallas = UIFabrica.Boton(filaAjustes, "", Paleta.Gris, Paleta.Texto, 24, () => this.juego.CambiarSensibilidadPantallas());
-        Button nueva = UIFabrica.Boton(filaAjustes, "Nueva partida", Paleta.TramoDemasiado, Paleta.Texto, 26, () => this.juego.NuevaPartida());
-        UIFabrica.Anclar((RectTransform)ausencia.transform, 0f, 0f, 0.32f, 1f);
-        UIFabrica.Anclar((RectTransform)botonPantallas.transform, 0.34f, 0f, 0.66f, 1f);
-        UIFabrica.Anclar((RectTransform)nueva.transform, 0.68f, 0f, 1f, 1f);
+        Button ausencia = UIFabrica.Boton(filaAjustes, "Simular 6 h fuera", Paleta.Gris, Paleta.Texto, 22, () => this.juego.SimularAusencia(6 * 60));
+        botonPantallas = UIFabrica.Boton(filaAjustes, "", Paleta.Gris, Paleta.Texto, 20, () => this.juego.CambiarSensibilidadPantallas());
+        Button nueva = UIFabrica.Boton(filaAjustes, "Nueva partida", Paleta.TramoDemasiado, Paleta.Texto, 22, () => this.juego.NuevaPartida());
+        botonSonido = UIFabrica.Boton(filaAjustes, "", Paleta.Gris, Paleta.Texto, 24, () => Sonidos.Alternar());
+        UIFabrica.Anclar((RectTransform)ausencia.transform, 0f, 0f, 0.235f, 1f);
+        UIFabrica.Anclar((RectTransform)botonPantallas.transform, 0.255f, 0f, 0.49f, 1f);
+        UIFabrica.Anclar((RectTransform)botonSonido.transform, 0.51f, 0f, 0.745f, 1f);
+        UIFabrica.Anclar((RectTransform)nueva.transform, 0.765f, 0f, 1f, 1f);
         UIFabrica.Relleno(columna);
     }
 
@@ -122,6 +124,7 @@ public class PantallaAvatar : Pantalla
             UIFabrica.CambiarTexto(botonesPrenda[i], accion);
             botonesPrenda[i].image.color = puesta ? Paleta.Verde : tiene ? Paleta.DeArea(Area.Mente) : alcanzable ? Paleta.Hex("E3B341") : Paleta.Gris;
         }
+        UIFabrica.CambiarTexto(botonSonido, Sonidos.EstanActivos ? "Sonido: sí" : "Sonido: no");
         SensibilidadPantallas s = juego.Jornada.Datos.pantallas;
         UIFabrica.CambiarTexto(botonPantallas, "Pantallas antes de dormir: " + (s == SensibilidadPantallas.Nada ? "nada" : s == SensibilidadPantallas.Algo ? "algo" : "mucho"));
     }

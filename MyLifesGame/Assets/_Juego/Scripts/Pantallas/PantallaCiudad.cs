@@ -14,6 +14,7 @@ public class PantallaCiudad : Pantalla
     private readonly RectTransform hoja;
     private readonly RectTransform contenidoHoja;
     private int edificioElegido = -1;
+    private int nivelBarrios = -1;
 
     public PantallaCiudad(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla ciudad", 0, true)
     {
@@ -122,6 +123,7 @@ public class PantallaCiudad : Pantalla
     {
         Progreso pr = juego.Progreso;
         nivel.text = "Nv. " + pr.Nivel;
+        if (pr.Nivel != nivelBarrios) { nivelBarrios = pr.Nivel; juego.Ciudad.ActualizarBarrios(pr.Nivel); }
         barraXp.fillAmount = pr.XpEnNivel / (float)Progreso.XpPorNivel;
         reloj.text = "Día " + juego.Dia + " · " + Jornada.Hora(juego.MinutoEntero);
         monedas.text = pr.Datos.monedas.ToString();

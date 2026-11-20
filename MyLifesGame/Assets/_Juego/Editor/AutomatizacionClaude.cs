@@ -13,6 +13,16 @@ using UnityEngine;
 public static class AutomatizacionClaude
 {
     private static double proximo;
+    private static bool mixamoIntentado;
+    private static UnityEditor.PackageManager.Requests.AddRequest peticionPaquete;
+
+    /// <summary>Instala un paquete de Unity por nombre (la versión la elige el gestor de paquetes). Resultado en paquete_resultado.txt.</summary>
+    private static void InstalarPaquete(string nombre)
+    {
+        if (string.IsNullOrEmpty(nombre)) return;
+        EscribirEstado("instalando paquete " + nombre);
+        peticionPaquete = UnityEditor.PackageManager.Client.Add(nombre);
+    }
 
     private static string Carpeta
     {
@@ -64,7 +74,32 @@ public static class AutomatizacionClaude
                 return;
             }
 
+            string paquete = Path.Combine(Carpeta, "paquete.txt");
+            if (File.Exists(paquete))
+            {
+                string nombre = File.ReadAllText(paquete).Trim();
+                File.Delete(paquete);
+                InstalarPaquete(nombre);
+                return;
+            }
+            if (peticionPaquete != null)
+            {
+                if (!peticionPaquete.IsCompleted) return;
+                string res = peticionPaquete.Status == UnityEditor.PackageManager.StatusCode.Success
+                    ? "OK " + peticionPaquete.Result.packageId
+                    : "ERROR " + (peticionPaquete.Error != null ? peticionPaquete.Error.message : "?");
+                File.WriteAllText(Path.Combine(Carpeta, "paquete_resultado.txt"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " | " + res + "\n");
+                peticionPaquete = null;
+            }
+
+            ImportarModelos3D.CopiarNuevos();
             AssetDatabase.Refresh();
+            if (!mixamoIntentado)
+            {
+                string r = ImportarModelos3D.ExportarParaMixamo();
+                if (r.StartsWith("exportado") || r == "ya exportado") mixamoIntentado = true;
+                if (r.StartsWith("exportado")) File.WriteAllText(Path.Combine(Carpeta, "mixamo.txt"), r + "\n");
+            }
             EscribirEstado("refresco");
         }
         catch (Exception e)

@@ -547,8 +547,9 @@ public partial class Ciudad3D : MonoBehaviour
         if (Mouse.current != null)
         {
             float rueda = Mouse.current.scroll.ReadValue().y;
-            if (Mathf.Abs(rueda) > 0.01f) zoom = Mathf.Clamp(zoom - rueda * 0.0012f, 0.55f, 1.45f); // zoom limitado: el avatar siempre se ve
+            if (Mathf.Abs(rueda) > 0.01f) zoom = Mathf.Clamp(zoom - rueda * 0.0012f, ZoomMin, ZoomMax);
         }
+        if (Activa && Pellizco()) return;
         Pointer puntero = Pointer.current;
         if (!Activa || puntero == null) { pulsado = false; return; }
 
@@ -576,6 +577,44 @@ public partial class Ciudad3D : MonoBehaviour
             pulsado = false;
             if (!arrastrando && !Caminando) Tocar(pos);
         }
+    }
+
+    private const float ZoomMin = 0.38f, ZoomMax = 1.9f;
+    private float distanciaPellizco;
+    private bool pellizcando;
+
+    /// <summary>Zoom con dos dedos en el móvil. Mientras se pellizca no se arrastra ni se toca nada.</summary>
+    private bool Pellizco()
+    {
+        Touchscreen pantalla = Touchscreen.current;
+        if (pantalla == null) return false;
+        var t0 = pantalla.touches[0];
+        var t1 = pantalla.touches[1];
+        if (t0.press.isPressed && t1.press.isPressed)
+        {
+            float d = Vector2.Distance(t0.position.ReadValue(), t1.position.ReadValue());
+            if (pellizcando && distanciaPellizco > 1f && d > 1f)
+                zoom = Mathf.Clamp(zoom * distanciaPellizco / d, ZoomMin, ZoomMax);
+            distanciaPellizco = d;
+            pellizcando = true;
+            pulsado = false;
+            arrastrando = true;
+            return true;
+        }
+        if (pellizcando)
+        {
+            // Hasta levantar todos los dedos no vuelve el arrastre (evita saltos al soltar uno)
+            if (!t0.press.isPressed && !t1.press.isPressed) pellizcando = false;
+            pulsado = false;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Acercar o alejar desde botones (+ / −).</summary>
+    public void CambiarZoom(float factor)
+    {
+        zoom = Mathf.Clamp(zoom * factor, ZoomMin, ZoomMax);
     }
 
     private void Tocar(Vector2 pos)

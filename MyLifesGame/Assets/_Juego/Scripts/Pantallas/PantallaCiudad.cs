@@ -17,6 +17,7 @@ public class PantallaCiudad : Pantalla
     private int nivelBarrios = -1;
     private readonly RectTransform guia;
     private readonly Image fondoAyuda;
+    private readonly Image pildoraZoom;
 
     public PantallaCiudad(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla ciudad", 0, true)
     {
@@ -131,6 +132,19 @@ public class PantallaCiudad : Pantalla
         mano.raycastTarget = false;
         Iconos.Mano(mano);
         guia.gameObject.SetActive(false);
+
+        // Botones de zoom (+ / −) a la derecha, como en la referencia; en el móvil también vale pellizcar
+        pildoraZoom = UIFabrica.Caja(raizRT, "Zoom", Paleta.Tarjeta);
+        RectTransform rz = pildoraZoom.rectTransform;
+        rz.anchorMin = rz.anchorMax = new Vector2(1, 0);
+        rz.pivot = new Vector2(1, 0);
+        rz.sizeDelta = new Vector2(92, 190);
+        rz.anchoredPosition = new Vector2(-28, AltoBarra + 60);
+        UIFabrica.Sombra(pildoraZoom, 4f, 0.15f);
+        Button mas = UIFabrica.Boton(rz, "+", Paleta.Tarjeta, Paleta.Texto, 52, () => this.juego.Ciudad.CambiarZoom(0.8f));
+        UIFabrica.Anclar((RectTransform)mas.transform, 0.06f, 0.52f, 0.94f, 0.97f);
+        Button menos = UIFabrica.Boton(rz, "\u2212", Paleta.Tarjeta, Paleta.Texto, 52, () => this.juego.Ciudad.CambiarZoom(1.25f));
+        UIFabrica.Anclar((RectTransform)menos.transform, 0.06f, 0.03f, 0.94f, 0.48f);
     }
 
     public bool GuiaVisible { get { return guia.gameObject.activeSelf; } }
@@ -145,6 +159,7 @@ public class PantallaCiudad : Pantalla
     public override void Actualizar()
     {
         Progreso pr = juego.Progreso;
+        pildoraZoom.gameObject.SetActive(!HojaAbierta && !GuiaVisible);
         nivel.text = "Nv. " + pr.Nivel;
         if (pr.Nivel != nivelBarrios) { nivelBarrios = pr.Nivel; juego.Ciudad.ActualizarBarrios(pr.Nivel); }
         barraXp.fillAmount = pr.XpEnNivel / (float)Progreso.XpPorNivel;

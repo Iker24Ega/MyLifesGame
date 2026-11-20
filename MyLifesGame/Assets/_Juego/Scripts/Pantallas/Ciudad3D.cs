@@ -129,8 +129,14 @@ public class Ciudad3D : MonoBehaviour
         var datosCam = camara.GetUniversalAdditionalCameraData();
         if (datosCam != null)
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // En la versión web, sin postproceso ni SMAA (sus shaders no siempre entran en la compilación)
+            datosCam.renderPostProcessing = false;
+            datosCam.antialiasing = AntialiasingMode.None;
+#else
             datosCam.renderPostProcessing = true;
             datosCam.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+#endif
         }
 
         Light sol = null;

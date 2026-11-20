@@ -84,6 +84,7 @@ public static class AutomatizacionClaude
         EscribirEstado("compilando web");
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
         PlayerSettings.WebGL.decompressionFallback = true;
+        PlayerSettings.stripEngineCode = true; // link.xml conserva los colisionadores; sin recorte la versión web desborda la pila
         PlayerSettings.productName = "My Life's Game";
         var opciones = new BuildPlayerOptions
         {
@@ -93,9 +94,24 @@ public static class AutomatizacionClaude
             options = BuildOptions.None
         };
         var informe = BuildPipeline.BuildPlayer(opciones);
+        AjustarIndiceWeb(Path.Combine(salida, "index.html"));
         string resumen = informe.summary.result + " | " + (informe.summary.totalSize / (1024 * 1024)) + " MB | " + informe.summary.totalTime;
         File.WriteAllText(Path.Combine(Carpeta, "build_web_resultado.txt"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " | " + resumen + "\n");
         EscribirEstado("web terminada: " + informe.summary.result);
+    }
+
+    /// <summary>Retoca la página de la versión web: título, guardado persistente, nitidez en móvil y tamaño de móvil en el ordenador.</summary>
+    private static void AjustarIndiceWeb(string ruta)
+    {
+        if (!File.Exists(ruta)) return;
+        string s = File.ReadAllText(ruta);
+        s = s.Replace("<title>Unity Web Player | My Life's Game</title>", "<title>My Life's Game</title>");
+        s = s.Replace("<html lang=\"en-us\">", "<html lang=\"es\">");
+        s = s.Replace("// config.autoSyncPersistentDataPath = true;", "config.autoSyncPersistentDataPath = true; // la partida se guarda en el navegador");
+        s = s.Replace("// config.devicePixelRatio = 1;", "config.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);");
+        s = s.Replace("fullscreenContainer.style.width = \"960px\";", "fullscreenContainer.style.width = \"432px\"; canvas.width = 432; canvas.height = 768;");
+        s = s.Replace("fullscreenContainer.style.height = \"600px\";", "fullscreenContainer.style.height = \"768px\";");
+        File.WriteAllText(ruta, s);
     }
 
     private static void EscribirEstado(string evento)

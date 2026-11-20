@@ -1,0 +1,4 @@
+<!-- Evita que la compilación web elimine clases que se crean por código (colisionadores de las primitivas). -->
+<linker>
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
+</linker>

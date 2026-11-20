@@ -115,3 +115,6 @@ InitTestScene*.unity*
 
 # Versión web compilada (se genera con Automatizacion/build_web.txt)
 /[Bb]uildWeb/
+
+# Restos de la compilación web (Burst)
+/[Dd]ata/

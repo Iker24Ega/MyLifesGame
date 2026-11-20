@@ -175,4 +175,24 @@ public static class Iconos
         DibujarTrazo(f, area, Color.white);
         f.Escala = 1f;
     }
+
+    /// <summary>Mano que señala hacia abajo (para guiar al jugador), con borde oscuro.</summary>
+    public static void Mano(FormasUI f)
+    {
+        f.Limpiar();
+        Color borde = Paleta.Texto, piel = Paleta.Hex("FFE2C6");
+        for (int capa = 0; capa < 2; capa++)
+        {
+            Color c = capa == 0 ? borde : piel;
+            float g = capa == 0 ? 0.08f : 0f;
+            f.Rect(new Vector2(-0.05f, -0.42f), new Vector2(0.28f + g, 0.8f + g), 0f, c);          // índice
+            f.Circulo(new Vector2(-0.05f, -0.82f), 0.14f + g * 0.5f, c);                               // yema
+            f.Rect(new Vector2(0.18f, 0.22f), new Vector2(0.78f + g, 0.62f + g), 0f, c);           // palma
+            f.Circulo(new Vector2(0.18f, 0.52f), 0.39f + g * 0.5f, c);
+            f.Rect(new Vector2(-0.32f, 0.12f), new Vector2(0.22f + g, 0.48f + g), -28f, c);       // pulgar
+            f.Rect(new Vector2(0.18f, 0.86f), new Vector2(0.62f + g, 0.24f + g), 0f, capa == 0 ? borde : Paleta.Coral); // puño de la manga
+        }
+        f.Linea(new Vector2(0.15f, 0.0f), new Vector2(0.15f, 0.28f), 0.04f, new Color(0.29f, 0.2f, 0.15f, 0.35f));
+        f.Linea(new Vector2(0.38f, 0.0f), new Vector2(0.38f, 0.28f), 0.04f, new Color(0.29f, 0.2f, 0.15f, 0.35f));
+    }
 }

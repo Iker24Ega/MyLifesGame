@@ -38,6 +38,8 @@ public class Juego : MonoBehaviour
 
     private GameObject canvasGO;
     private PantallaCiudad pCiudad;
+    private PantallaBienvenida pBienvenida;
+    public PantallaBienvenida Bienvenida { get { return pBienvenida; } }
     private PantallaHoy pHoy;
     private PantallaEquilibrio pEquilibrio;
     private PantallaHacer pHacer;
@@ -87,6 +89,13 @@ public class Juego : MonoBehaviour
     private void Inicializar(DatosPartida d, bool cargada)
     {
         Datos = d;
+        if (cargada && d.version < 2)
+        {
+            // Partidas anteriores al onboarding: no se les enseña la bienvenida
+            d.bienvenidaHecha = true;
+            d.guiaHacerHecha = true;
+            d.version = 2;
+        }
         Jornada = new Jornada(Tabla, d.jornada);
         Progreso = new Progreso(d.progreso);
         MinutoJuego = Mathf.Max(d.minutoJuego, d.jornada.minutoActual);
@@ -114,6 +123,7 @@ public class Juego : MonoBehaviour
         pRegreso = new PantallaRegreso(this, canvas);
         pAvatar = new PantallaAvatar(this, canvas);
         pAlbum = new PantallaAlbum(this, canvas);
+        pBienvenida = new PantallaBienvenida(this, canvas);
         foreach (Pantalla p in Todas()) p.Ocultar();
         CrearAviso(canvas);
         Ciudad.AlTocarEdificio += pCiudad.AlTocarEdificio;
@@ -150,13 +160,14 @@ public class Juego : MonoBehaviour
         else Debug.Log("[Diario] Partida nueva.");
 
         if (primera == pCiudad && !Jornada.Datos.checkInHecho) primera = pCheckIn;
+        if (!d.bienvenidaHecha) primera = pBienvenida;
         Mostrar(primera);
         GuardarAhora();
     }
 
     private IEnumerable<Pantalla> Todas()
     {
-        return new Pantalla[] { pCiudad, pHoy, pEquilibrio, pHacer, pCronometro, pResultado, pCheckIn, pRegreso, pAvatar, pAlbum };
+        return new Pantalla[] { pCiudad, pHoy, pEquilibrio, pHacer, pCronometro, pResultado, pCheckIn, pRegreso, pAvatar, pAlbum, pBienvenida };
     }
 
     private Transform CrearCanvas()
@@ -216,7 +227,9 @@ public class Juego : MonoBehaviour
             // Con la hoja de la ciudad abierta, el aviso sube por encima de ella para no taparla
             var rtAviso = (RectTransform)aviso.transform.parent;
             bool hojaAbierta = actual == pCiudad && pCiudad.HojaAbierta;
-            rtAviso.anchoredPosition = new Vector2(0, hojaAbierta ? pCiudad.AltoHoja + Pantalla.AltoBarra + 30 : Pantalla.AltoBarra + 40);
+            float alto = hojaAbierta ? pCiudad.AltoHoja + Pantalla.AltoBarra + 30 : Pantalla.AltoBarra + 40;
+            if (actual == pCiudad && pCiudad.GuiaVisible) alto = Pantalla.AltoBarra + 380;
+            rtAviso.anchoredPosition = new Vector2(0, alto);
         }
 
         if (Time.unscaledTime > proximoGuardado)
@@ -278,7 +291,7 @@ public class Juego : MonoBehaviour
         }
     }
 
-    public void IrAHacer() { Mostrar(pHacer); }
+    public void IrAHacer() { Datos.guiaHacerHecha = true; Mostrar(pHacer); }
 
     /// <summary>Para las capturas automáticas: simula tocar un edificio de la ciudad.</summary>
     public void CapturaTocarEdificio(int indice) { Mostrar(pCiudad); pCiudad.AlTocarEdificio(indice); }
@@ -436,6 +449,19 @@ public class Juego : MonoBehaviour
         SensibilidadPantallas s = Jornada.Datos.pantallas;
         Jornada.Datos.pantallas = s == SensibilidadPantallas.Nada ? SensibilidadPantallas.Algo
             : s == SensibilidadPantallas.Algo ? SensibilidadPantallas.Mucho : SensibilidadPantallas.Nada;
+    }
+
+    /// <summary>Fin del onboarding: aplica los valores iniciales (o los de serie si se saltó) y la sudadera regalada.</summary>
+    public void TerminarBienvenida(float[] valores, string prenda)
+    {
+        if (valores != null)
+            foreach (Area a in Areas.Todas) Jornada.Estado[a] = valores[(int)a];
+        if (!Progreso.Datos.ropaComprada.Contains(prenda)) Progreso.Datos.ropaComprada.Add(prenda);
+        Progreso.Datos.ropaPuesta = prenda;
+        Ciudad.PonerRopa(Catalogos.BuscarPrenda(prenda).colorHex);
+        Datos.bienvenidaHecha = true;
+        GuardarAhora();
+        Mostrar(Jornada.Datos.checkInHecho ? (Pantalla)pCiudad : pCheckIn);
     }
 
     public void NuevaPartida()

@@ -36,6 +36,18 @@ public class CapturadorPantallas : MonoBehaviour
         Debug.Log("[Capturas] Empieza el recorrido.");
 
         yield return Esperar(1.5f);
+        yield return Captura("00a_bienvenida");
+        j.Bienvenida.IrAPaso(1);
+        yield return Esperar(0.5f);
+        yield return Captura("00b_sudadera");
+        j.Bienvenida.IrAPaso(2);
+        yield return Esperar(0.5f);
+        yield return Captura("00c_pregunta");
+        j.Bienvenida.IrAPaso(7);
+        yield return Esperar(0.5f);
+        yield return Captura("00d_resumen");
+        j.TerminarBienvenida(new float[] { 50, 50, 40, 75, 50 }, "teal");
+        yield return Esperar(0.6f);
         yield return Captura("01_checkin");
 
         j.CompletarCheckIn(3, 3, new List<Area> { Area.Fisico, Area.Social }, false);

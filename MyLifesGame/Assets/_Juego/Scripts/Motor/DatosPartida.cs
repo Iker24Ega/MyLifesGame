@@ -15,7 +15,9 @@ namespace MyLifesGame.Motor
     [Serializable]
     public class DatosPartida
     {
-        public int version = 1;
+        public int version = 2;
+        public bool bienvenidaHecha;   // onboarding de la primera partida
+        public bool guiaHacerHecha;    // la mano que señala "Hacer" la primera vez
         public DatosJornada jornada = new DatosJornada();
         public DatosProgreso progreso = new DatosProgreso();
         public DatosCiudad ciudad = new DatosCiudad();

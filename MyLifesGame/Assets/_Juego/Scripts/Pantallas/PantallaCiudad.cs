@@ -15,6 +15,8 @@ public class PantallaCiudad : Pantalla
     private readonly RectTransform contenidoHoja;
     private int edificioElegido = -1;
     private int nivelBarrios = -1;
+    private readonly RectTransform guia;
+    private readonly Image fondoAyuda;
 
     public PantallaCiudad(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla ciudad", 0, true)
     {
@@ -89,7 +91,7 @@ public class PantallaCiudad : Pantalla
 
         UIFabrica.Relleno(columna);
         RectTransform filaAyuda = UIFabrica.Fila(columna, "Ayuda", 56);
-        Image fondoAyuda = UIFabrica.Caja(filaAyuda, "Fondo", new Color(1, 1, 1, 0.75f));
+        fondoAyuda = UIFabrica.Caja(filaAyuda, "Fondo", new Color(1, 1, 1, 0.75f));
         UIFabrica.Anclar(fondoAyuda.rectTransform, 0, 0, 1, 1);
         fondoAyuda.raycastTarget = false;
         Text ayuda = UIFabrica.Texto(fondoAyuda.transform, "Toca un edificio: si tiene \"?\", decide qué es; si ya tiene papel, ve allí.", 24, Paleta.Texto, TextAnchor.MiddleCenter);
@@ -109,8 +111,29 @@ public class PantallaCiudad : Pantalla
         hoja.anchoredPosition = new Vector2(0, AltoBarra);
         contenidoHoja = UIFabrica.Columna(hoja, "Contenido", 40, 16);
         hoja.gameObject.SetActive(false);
+
+        // Guía de la primera vez: una mano que señala el botón "Hacer"
+        guia = UIFabrica.Crear("Guía", raizRT);
+        guia.anchorMin = guia.anchorMax = new Vector2(0.5f, 0f);
+        guia.pivot = new Vector2(0.5f, 0f);
+        guia.sizeDelta = new Vector2(600, 330);
+        Image globo = UIFabrica.Caja(guia, "Globo", Paleta.Blanco);
+        UIFabrica.Anclar(globo.rectTransform, 0, 0.56f, 1, 1);
+        UIFabrica.Sombra(globo, 6f, 0.2f);
+        globo.raycastTarget = false;
+        Text tg = UIFabrica.Texto(globo.transform, "¡Tu primera acción! Toca «Hacer» y elige qué vas a hacer de verdad.", 30, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(tg.rectTransform, 0.04f, 0, 0.96f, 1);
+        RectTransform zm = UIFabrica.Crear("Mano", guia);
+        zm.anchorMin = zm.anchorMax = new Vector2(0.5f, 0f);
+        zm.pivot = new Vector2(0.5f, 0f);
+        zm.sizeDelta = new Vector2(150, 150);
+        FormasUI mano = FormasUI.En(zm.gameObject);
+        mano.raycastTarget = false;
+        Iconos.Mano(mano);
+        guia.gameObject.SetActive(false);
     }
 
+    public bool GuiaVisible { get { return guia.gameObject.activeSelf; } }
     public bool HojaAbierta { get { return hoja.gameObject.activeSelf; } }
     public float AltoHoja { get { return hoja.sizeDelta.y; } }
 
@@ -128,6 +151,9 @@ public class PantallaCiudad : Pantalla
         reloj.text = "Día " + juego.Dia + " · " + Jornada.Hora(juego.MinutoEntero);
         monedas.text = pr.Datos.monedas.ToString();
         foreach (Area area in Areas.Todas) rellenos[(int)area].fillAmount = juego.Jornada.Estado[area] / 100f;
+        bool verGuia = !juego.Datos.guiaHacerHecha && !HojaAbierta && !juego.Ciudad.Caminando;
+        if (guia.gameObject.activeSelf != verGuia) { guia.gameObject.SetActive(verGuia); guia.SetAsLastSibling(); fondoAyuda.gameObject.SetActive(!verGuia); }
+        if (verGuia) guia.anchoredPosition = new Vector2(0, AltoBarra + 10f + Mathf.Abs(Mathf.Sin(Time.unscaledTime * 4f)) * 26f);
         if (juego.Ciudad.Caminando) estado.text = "Caminando...";
         else if (!hoja.gameObject.activeSelf) estado.text = "";
     }

@@ -73,7 +73,9 @@ public partial class Ciudad3D : MonoBehaviour
         public Text etiqueta;
         public GameObject pastilla;
         public float alto = 6f;
-        public Vector3 Puerta { get { return new Vector3(centro.x, 0, centro.z - 5.6f); } }
+        public Vector3 puertaLogica;
+        public float giro;
+        public Vector3 Puerta { get { return Curva(puertaLogica); } }
     }
 
     // ---------------------------------------------------------------- construcción
@@ -92,7 +94,7 @@ public partial class Ciudad3D : MonoBehaviour
 
         for (int i = 0; i < Solares.Length; i++)
         {
-            var s = new Solar { centro = Solares[i] };
+            var s = new Solar { centro = Curva(Solares[i]), puertaLogica = Solares[i] + new Vector3(0, 0, -5.6f), giro = GiroSolar(i) };
             s.raiz = new GameObject("Solar " + i).transform;
             s.raiz.SetParent(transform, false);
             s.raiz.gameObject.AddComponent<Lote>().indice = i;
@@ -126,8 +128,8 @@ public partial class Ciudad3D : MonoBehaviour
         if (datosCam != null)
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            // En la versión web, sin postproceso ni SMAA (sus shaders no siempre entran en la compilación)
-            datosCam.renderPostProcessing = false;
+            // En la versión web: postproceso de color (calidez, saturación, viñeta) pero sin SMAA ni bloom, que pesan en el móvil
+            datosCam.renderPostProcessing = !SinPostproceso;
             datosCam.antialiasing = AntialiasingMode.None;
 #else
             datosCam.renderPostProcessing = true;
@@ -156,6 +158,19 @@ public partial class Ciudad3D : MonoBehaviour
         RenderSettings.fogStartDistance = 70f;
         RenderSettings.fogEndDistance = 160f;
 
+        if (SinPostproceso)
+        {
+            // Versión web: el postproceso de URP no es fiable en WebGL. Se imita su calidez con luz y ambiente
+            // algo más cálidos y una capa de pantalla (tinte melocotón + viñeta suave) bajo la interfaz.
+            sol.intensity = 1.6f;
+            sol.color = Paleta.Hex("FFDDB0");
+            RenderSettings.ambientSkyColor = Paleta.Hex("D6E3F2");
+            RenderSettings.ambientEquatorColor = Paleta.Hex("FBE6C6");
+            RenderSettings.ambientGroundColor = Paleta.Hex("C8B48E");
+            CapaCalida();
+            return;
+        }
+
         // Postproceso suave y cálido
         var go = new GameObject("Postproceso");
         go.transform.SetParent(transform, false);
@@ -163,9 +178,11 @@ public partial class Ciudad3D : MonoBehaviour
         vol.isGlobal = true;
         vol.priority = 50;
         var perfil = ScriptableObject.CreateInstance<VolumeProfile>();
+#if !UNITY_WEBGL || UNITY_EDITOR
         var bloom = perfil.Add<Bloom>(true);
         bloom.intensity.Override(0.35f);
         bloom.threshold.Override(1.05f);
+#endif
         var color = perfil.Add<ColorAdjustments>(true);
         color.postExposure.Override(0.15f);
         color.saturation.Override(8f);
@@ -179,6 +196,58 @@ public partial class Ciudad3D : MonoBehaviour
         tono.mode.Override(TonemappingMode.None);
         vol.profile = perfil;
     }
+
+    /// <summary>true en la versión web (o en el editor si existe Automatizacion/ligero.txt, para revisarla).</summary>
+    public static bool SinPostproceso
+    {
+        get
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return false; // se probó la capa de imitación y quedaba apagada; la web usa el postproceso real
+#elif UNITY_EDITOR
+            return System.IO.File.Exists(System.IO.Path.Combine(Application.dataPath, "..", "Automatizacion", "ligero.txt"));
+#else
+            return false;
+#endif
+        }
+    }
+
+    /// <summary>Capa a pantalla completa bajo la interfaz: tinte cálido muy suave y viñeta (bordes algo más tostados).</summary>
+    private void CapaCalida()
+    {
+        var go = new GameObject("Capa cálida", typeof(Canvas));
+        go.transform.SetParent(transform, false);
+        var canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = -10; // por debajo de la interfaz del juego
+        const int N = 128;
+        var tex = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        Color tinte = Paleta.Hex("FFB46B"), borde = Paleta.Hex("C07A45");
+        var px = new Color[N * N];
+        for (int y = 0; y < N; y++)
+            for (int x = 0; x < N; x++)
+            {
+                float dx = (x + 0.5f) / N - 0.5f, dy = (y + 0.5f) / N - 0.5f;
+                float d = Mathf.Sqrt(dx * dx * 1.0f + dy * dy * 0.7f) * 2f;      // 0 centro, ~1 borde
+                float v = Mathf.SmoothStep(0.7f, 1.35f, d);                        // viñeta
+                Color c = Color.Lerp(tinte, borde, v);
+                c.a = 0.03f + v * 0.12f;
+                px[y * N + x] = c;
+            }
+        tex.SetPixels(px); tex.Apply();
+        var img = new GameObject("Tinte", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+        img.transform.SetParent(go.transform, false);
+        img.texture = tex;
+        img.raycastTarget = false;
+        var rt = img.rectTransform;
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero;
+        capaCalida = go;
+    }
+
+    private GameObject capaCalida;
+
+    /// <summary>La capa cálida solo tiene sentido cuando se ve la ciudad.</summary>
+    public void MostrarCapaCalida(bool si) { if (capaCalida != null) capaCalida.SetActive(si); }
 
     private void Calle(Vector3 centro, bool vertical)
     {
@@ -215,7 +284,7 @@ public partial class Ciudad3D : MonoBehaviour
 
     private void Decorado(Vector3 pos, int k, string[] variantes, string ruta, float ancho, float giro)
     {
-        Modelo(ruta + variantes[(k * 7) % variantes.Length], transform, pos, ancho, giro);
+        Modelo(ruta + variantes[(k * 7) % variantes.Length], transform, Curva(pos), ancho, giro + ((k * 37) % 13 - 6));
     }
 
     // ---------------------------------------------------------------- piezas y modelos
@@ -323,20 +392,21 @@ public partial class Ciudad3D : MonoBehaviour
     {
         Transform p = s.modelo.transform;
         Vector3 c = s.centro + new Vector3(0, 0, 0.8f);
+        s_giroActual = s.giro;
         if (ModeloGenerado(rol, indice, p, s.centro)) return;
         switch (rol)
         {
-            case "casa": Modelo("Ciudad/Suburban/building-type-a", p, c, AnchoSolar, 180f); Valla(p, c); break;
-            case "amigos": Modelo("Ciudad/Suburban/building-type-k", p, c, AnchoSolar, 180f); Valla(p, c); break;
-            case "gimnasio": Modelo("Ciudad/Comercial/building-c", p, c, AnchoSolar, 180f); break;
+            case "casa": Modelo("Ciudad/Suburban/building-type-a", p, c, AnchoSolar, 180f + s.giro); Valla(p, c); break;
+            case "amigos": Modelo("Ciudad/Suburban/building-type-k", p, c, AnchoSolar, 180f + s.giro); Valla(p, c); break;
+            case "gimnasio": Modelo("Ciudad/Comercial/building-c", p, c, AnchoSolar, 180f + s.giro); break;
             case "cafeteria":
-                Modelo("Ciudad/Comercial/building-a", p, c, AnchoSolar, 180f);
+                Modelo("Ciudad/Comercial/building-a", p, c, AnchoSolar, 180f + s.giro);
                 Modelo("Ciudad/Comercial/detail-parasol-a", p, c + new Vector3(-2.6f, 0, -4.2f), 1.8f, 0f);
                 Modelo("Ciudad/Comercial/detail-parasol-b", p, c + new Vector3(2.6f, 0, -4.2f), 1.8f, 0f);
                 break;
-            case "biblioteca": Modelo("Ciudad/Comercial/building-e", p, c, AnchoSolar, 180f); break;
-            case "trabajo": Modelo("Ciudad/Comercial/building-g", p, c, AnchoSolar, 180f); break;
-            case "recreativos": Modelo("Ciudad/Comercial/building-h", p, c, AnchoSolar, 180f); break;
+            case "biblioteca": Modelo("Ciudad/Comercial/building-e", p, c, AnchoSolar, 180f + s.giro); break;
+            case "trabajo": Modelo("Ciudad/Comercial/building-g", p, c, AnchoSolar, 180f + s.giro); break;
+            case "recreativos": Modelo("Ciudad/Comercial/building-h", p, c, AnchoSolar, 180f + s.giro); break;
             case "parque":
                 Pieza(PrimitiveType.Cube, "Césped parque", s.centro + new Vector3(0, 0.03f, 0), new Vector3(9.5f, 0.06f, 9.5f), Paleta.Hex("93C47D"), p);
                 ArbolEn(p, s.centro + new Vector3(-2.5f, 0.1f, 2f), 1, 3.6f);
@@ -347,7 +417,7 @@ public partial class Ciudad3D : MonoBehaviour
                 break;
             default:
                 // Sin papel: casa sencilla y algo apagada, con el "?" encima
-                Modelo("Ciudad/Suburban/building-type-" + "fgjnpqrstu"[indice % 10], p, c, AnchoSolar * 0.9f, 180f);
+                Modelo("Ciudad/Suburban/building-type-" + "fgjnpqrstu"[indice % 10], p, c, AnchoSolar * 0.9f, 180f + s.giro);
                 break;
         }
     }
@@ -369,7 +439,7 @@ public partial class Ciudad3D : MonoBehaviour
         GameObject go = Modelos3D.Crear(nombre, p, AnchoSolar * 1.1f);
         go.transform.localPosition = centro;
         // El frente del modelo mira hacia la cámara de la ciudad, como en la imagen de Flow
-        go.transform.localRotation = Quaternion.identity;
+        go.transform.localRotation = Quaternion.Euler(0, s_giroActual, 0);
         return true;
     }
 
@@ -511,19 +581,28 @@ public partial class Ciudad3D : MonoBehaviour
         Caminando = true; avatar3D.Caminando = true;
         textoCamino.text = CaminoA(datos.roles[indice]);
         rotuloCamino.gameObject.SetActive(true);
-        Vector3 inicio = avatar.position;
-        Vector3 destino = solares[indice].Puerta;
+        Vector3 inicio = solares[Mathf.Clamp(datos.edificioActual, 0, solares.Count - 1)].puertaLogica;
+        Vector3 destino = solares[indice].puertaLogica;
         float calleInicio = MasCercana(inicio.z);
         float calleDestino = MasCercana(destino.z);
         float calleVertical = MasCercana(inicio.x);
-        var puntos = new List<Vector3>
+        var claves = new List<Vector3>
         {
+            inicio,
             new Vector3(inicio.x, 0, calleInicio),
             new Vector3(calleVertical, 0, calleInicio),
             new Vector3(calleVertical, 0, calleDestino),
             new Vector3(destino.x, 0, calleDestino),
             destino,
         };
+        // Las calles son curvas: se recorre la ruta de la cuadrícula a pasos cortos, deformando cada punto
+        var puntos = new List<Vector3>();
+        for (int i = 1; i < claves.Count; i++)
+        {
+            float largo = Vector3.Distance(claves[i - 1], claves[i]);
+            int n = Mathf.Max(1, Mathf.CeilToInt(largo / 1.5f));
+            for (int j = 1; j <= n; j++) puntos.Add(Curva(Vector3.Lerp(claves[i - 1], claves[i], j / (float)n)));
+        }
         foreach (Vector3 p in puntos)
         {
             while ((avatar.position - p).sqrMagnitude > 0.01f)
@@ -544,6 +623,76 @@ public partial class Ciudad3D : MonoBehaviour
         if (alLlegar != null) alLlegar();
     }
 
+    // ---------------------------------------------------------------- mapa menos cuadriculado
+
+    /// <summary>
+    /// Deformación suave del plano: la ciudad se diseña en cuadrícula (rutas, distancias, modo construir) y se
+    /// dibuja "doblada", con calles que serpentean y manzanas que no están alineadas, como en la imagen de Flow.
+    /// En el origen no desplaza nada (la plaza queda en su sitio).
+    /// </summary>
+    public static Vector3 Curva(Vector3 p)
+    {
+        const float A = 2.4f;
+        float dx = A * Mathf.Sin(p.z * 0.085f) + 0.9f * Mathf.Sin(p.z * 0.21f + p.x * 0.05f) - 0.9f * Mathf.Sin(p.x * 0.05f);
+        float dz = A * Mathf.Sin(p.x * 0.075f) + 0.8f * Mathf.Sin(p.x * 0.19f + p.z * 0.04f) - 0.8f * Mathf.Sin(p.z * 0.04f);
+        return new Vector3(p.x + dx, p.y, p.z + dz);
+    }
+
+    /// <summary>Giro de cada manzana (las parcelas no están todas rectas).</summary>
+    public static float GiroSolar(int i)
+    {
+        float[] g = { 7f, -5f, 9f, -8f, 4f, -6f, 6f, -9f };
+        return g[i % g.Length];
+    }
+
+    private static float s_giroActual;
+
+    /// <summary>Cinta de suelo que sigue una línea curva (calles, río), con textura repetida a lo largo.</summary>
+    private GameObject Cinta(string nombre, List<Vector3> linea, float ancho, float y, Material mat, float metrosPorTesela)
+    {
+        int n = linea.Count;
+        var v = new Vector3[n * 2];
+        var uv = new Vector2[n * 2];
+        var tri = new int[(n - 1) * 6];
+        float recorrido = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            Vector3 dir = (linea[Mathf.Min(i + 1, n - 1)] - linea[Mathf.Max(i - 1, 0)]);
+            dir.y = 0; dir.Normalize();
+            Vector3 lado = new Vector3(dir.z, 0, -dir.x) * (ancho * 0.5f);
+            if (i > 0) recorrido += Vector3.Distance(linea[i], linea[i - 1]);
+            v[i * 2] = linea[i] - lado + Vector3.up * y;
+            v[i * 2 + 1] = linea[i] + lado + Vector3.up * y;
+            uv[i * 2] = new Vector2(0, recorrido / metrosPorTesela);
+            uv[i * 2 + 1] = new Vector2(ancho / metrosPorTesela, recorrido / metrosPorTesela);
+            if (i < n - 1)
+            {
+                int k = i * 6, a = i * 2;
+                tri[k] = a; tri[k + 1] = a + 2; tri[k + 2] = a + 1;
+                tri[k + 3] = a + 1; tri[k + 4] = a + 2; tri[k + 5] = a + 3;
+            }
+        }
+        var malla = new Mesh { name = nombre };
+        malla.vertices = v; malla.uv = uv; malla.triangles = tri;
+        malla.RecalculateNormals(); malla.RecalculateBounds();
+        var go = new GameObject(nombre, typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(transform, false);
+        go.GetComponent<MeshFilter>().sharedMesh = malla;
+        var r = go.GetComponent<MeshRenderer>();
+        r.sharedMaterial = mat;
+        r.shadowCastingMode = ShadowCastingMode.Off;
+        return go;
+    }
+
+    /// <summary>Puntos de una línea recta de la cuadrícula, deformados con <see cref="Curva"/>.</summary>
+    private static List<Vector3> LineaCurva(Vector3 desde, Vector3 hasta, float paso = 1.5f)
+    {
+        var l = new List<Vector3>();
+        int n = Mathf.Max(2, Mathf.CeilToInt(Vector3.Distance(desde, hasta) / paso));
+        for (int i = 0; i <= n; i++) l.Add(Curva(Vector3.Lerp(desde, hasta, i / (float)n)));
+        return l;
+    }
+
     private static float MasCercana(float v)
     {
         float mejor = Calles[0];
@@ -560,8 +709,8 @@ public partial class Ciudad3D : MonoBehaviour
         Vector3 objetivo = avatar.position + desplazamiento + Vector3.up * 2f + giro * Vector3.forward * 12f;
         Vector3 deseada = objetivo + giro * new Vector3(0, 50f, -54f) * zoom;
         // La neblina se aleja con el zoom: al alejarse no se lava todo de beige
-        RenderSettings.fogStartDistance = 70f * zoom;
-        RenderSettings.fogEndDistance = 160f * zoom;
+        RenderSettings.fogStartDistance = 95f * zoom;
+        RenderSettings.fogEndDistance = 210f * zoom;
         float k = instantaneo ? 1f : 1f - Mathf.Exp(-6f * Time.deltaTime);
         camara.transform.position = Vector3.Lerp(camara.transform.position, deseada, k);
         camara.transform.rotation = Quaternion.Slerp(camara.transform.rotation, Quaternion.LookRotation(objetivo - deseada), k);
@@ -747,7 +896,7 @@ public partial class Ciudad3D : MonoBehaviour
         SalirConstruir();
         guiasConstruir = new GameObject("Guías construir").transform;
         guiasConstruir.SetParent(transform, false);
-        Vector3 casa = Solares[IndiceCasa];
+        Vector3 casa = Curva(Solares[IndiceCasa]);
         Color[] colores = { Paleta.Hex("FFFFFF"), Paleta.Hex("FFF1D6") };
         for (int r = 1; r <= 2; r++)
         {
@@ -760,7 +909,7 @@ public partial class Ciudad3D : MonoBehaviour
                 Pieza(PrimitiveType.Cylinder, "Punto", p, new Vector3(0.55f, 0.01f, 0.55f), colores[r - 1], guiasConstruir);
             }
         }
-        marcaSolar = Pieza(PrimitiveType.Cylinder, "Marca solar", Solares[indice] + new Vector3(0, 0.1f, 0), new Vector3(11f, 0.01f, 11f), Paleta.Hex("F6B49F"), guiasConstruir).transform;
+        marcaSolar = Pieza(PrimitiveType.Cylinder, "Marca solar", Curva(Solares[indice]) + new Vector3(0, 0.1f, 0), new Vector3(11f, 0.01f, 11f), Paleta.Hex("F6B49F"), guiasConstruir).transform;
     }
 
     public void SalirConstruir()

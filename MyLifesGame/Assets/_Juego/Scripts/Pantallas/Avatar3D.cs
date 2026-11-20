@@ -23,6 +23,8 @@ public class Avatar3D : MonoBehaviour
     private float EscalaBrazos = 0.9f;
     /// <summary>true si usa el personaje generado (Flow → TRELLIS → Mixamo) en lugar del de Quaternius.</summary>
     public bool Generado { get; private set; }
+    /// <summary>true si el último avatar creado usa el personaje generado (para encuadrar los retratos).</summary>
+    public static bool UsaGenerado { get; private set; }
     private float caida;
     private int fotogramas;
 
@@ -42,6 +44,9 @@ public class Avatar3D : MonoBehaviour
     private static readonly Dictionary<Color, Material> materiales = new Dictionary<Color, Material>();
 
     public static readonly Color ColorSudadera = Paleta.Hex("3FA59E");
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void Reiniciar() { materiales.Clear(); }
 
     public static Avatar3D Crear(Transform padre, int capa = 0)
     {
@@ -124,6 +129,7 @@ public class Avatar3D : MonoBehaviour
         go.name = "Modelo";
         modelo = go.transform;
         Generado = true;
+        UsaGenerado = true;
         EscalaCabeza = 1f; EscalaPiernas = 1f; EscalaBrazos = 1f;
         foreach (Collider c in go.GetComponentsInChildren<Collider>()) Destroy(c);
         animador = go.GetComponentInChildren<Animator>();
@@ -155,13 +161,15 @@ public class Avatar3D : MonoBehaviour
         modelo.localScale = Vector3.one;
         modelo.localPosition = Vector3.zero;
         modelo.localRotation = Quaternion.identity;
-        float alto = AltoModelo();
+        // Los límites de un SkinnedMeshRenderer recién creado no son fiables (Mixamo): se mide la malla en pose de reposo
+        float min, max;
+        MedirMalla(go, out min, out max);
+        float alto = max - min;
         escala = alto > 0.01f ? Altura / alto : 1f;
         modelo.localScale = Vector3.one * escala;
         if (pieI != null) alturaTobillo = transform.InverseTransformPoint(pieI.position).y;
-        float suelo = float.MaxValue;
-        foreach (Renderer r in go.GetComponentsInChildren<Renderer>()) suelo = Mathf.Min(suelo, transform.InverseTransformPoint(r.bounds.min).y);
-        caida = suelo < float.MaxValue ? -suelo : 0f;
+        MedirMalla(go, out min, out max);
+        caida = -min;
         GuardarPies();
 
         foreach (AnimationClip c in Resources.LoadAll<AnimationClip>("Modelos3D/personaje"))
@@ -177,6 +185,24 @@ public class Avatar3D : MonoBehaviour
         Reproducir("Idle", 0f);
         CrearAccesorios();
         return true;
+    }
+
+    /// <summary>Altura mínima y máxima (en el espacio del avatar) de las mallas en pose de reposo.</summary>
+    private void MedirMalla(GameObject go, out float min, out float max)
+    {
+        min = float.MaxValue; max = float.MinValue;
+        foreach (SkinnedMeshRenderer smr in go.GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            if (smr.sharedMesh == null) continue;
+            Matrix4x4 m = transform.worldToLocalMatrix * smr.transform.localToWorldMatrix;
+            foreach (Vector3 v in smr.sharedMesh.vertices)
+            {
+                float y = m.MultiplyPoint3x4(v).y;
+                if (y < min) min = y;
+                if (y > max) max = y;
+            }
+        }
+        if (min > max) { min = 0f; max = Altura; }
     }
 
     private Transform H(HumanBodyBones b) { return animador != null ? animador.GetBoneTransform(b) : null; }

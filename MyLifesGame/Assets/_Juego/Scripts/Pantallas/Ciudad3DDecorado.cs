@@ -140,25 +140,36 @@ public partial class Ciudad3D
 
     private void SueloYCalles()
     {
-        texAdoquin = Adoquines(Paleta.Hex("DAD4CA"), Paleta.Hex("BDB4A8"), 7, 11);
-        texBaldosa = Baldosas(Paleta.Hex("EFE6D8"), Paleta.Hex("D8CDBC"));
-        texCesped = Cesped(Paleta.Hex("A6D47E"));
+        // Texturas generadas en Flow (Resources/Modelos3D/texturas) si están; si no, las hechas por código
+        Texture2D fAdoquin = Resources.Load<Texture2D>("Modelos3D/texturas/textura_adoquin");
+        Texture2D fAcera = Resources.Load<Texture2D>("Modelos3D/texturas/textura_acera");
+        Texture2D fCesped = Resources.Load<Texture2D>("Modelos3D/texturas/textura_cesped");
+        texAdoquin = fAdoquin != null ? fAdoquin : Adoquines(Paleta.Hex("DAD4CA"), Paleta.Hex("BDB4A8"), 7, 11);
+        texBaldosa = fAcera != null ? fAcera : Baldosas(Paleta.Hex("EFE6D8"), Paleta.Hex("D8CDBC"));
+        texCesped = fCesped != null ? fCesped : Cesped(Paleta.Hex("A6D47E"));
+        float mAdoquin = fAdoquin != null ? 4.5f : 2.6f, mAcera = fAcera != null ? 6f : 2.4f, mCesped = fCesped != null ? 9f : 6f;
 
         float borde = Paso * 2f;                    // fin de las calles exteriores
-        Losa("Césped", new Vector3(0, -0.05f, 0), new Vector3(170, 0.1f, 170), texCesped, 6f);
-        Losa("Pavimento", new Vector3(0, 0.0f, 0), new Vector3(borde * 2f + 6f, 0.06f, borde * 2f + 6f), texBaldosa, 2.4f);
+        Losa("Césped", new Vector3(0, -0.05f, 0), new Vector3(170, 0.1f, 170), texCesped, mCesped);
+        Losa("Pavimento", new Vector3(0, 0.0f, 0), new Vector3(borde * 2f + 6f, 0.06f, borde * 2f + 6f), texBaldosa, mAcera);
+        // Calles curvas (cintas que siguen la cuadrícula deformada); las interiores cruzan el río por los puentes
+        Material matCalle = MatTextura(texAdoquin, Vector2.one);
+        float largo = borde + 3f;
         foreach (float c in Calles)
         {
-            bool interior = Mathf.Abs(c) < Paso;   // las calles interiores cruzan el río por los puentes
-            if (interior) Losa("Calle", new Vector3(c, 0.045f, -6f), new Vector3(4.2f, 0.06f, borde * 2f + 18f), texAdoquin, 2.6f);
-            else Losa("Calle", new Vector3(c, 0.045f, 0f), new Vector3(4.2f, 0.06f, borde * 2f + 6f), texAdoquin, 2.6f);
-            Losa("Calle", new Vector3(0, 0.05f, c), new Vector3(borde * 2f + 6f, 0.06f, 4.2f), texAdoquin, 2.6f);
+            bool interior = Mathf.Abs(c) < Paso;
+            float sur = interior ? -largo - 12f : -largo;
+            Cinta("Calle", LineaCurva(new Vector3(c, 0, sur), new Vector3(c, 0, largo)), 4.4f, 0.045f, matCalle, mAdoquin);
+            Cinta("Calle", LineaCurva(new Vector3(-largo, 0, c), new Vector3(largo, 0, c)), 4.4f, 0.05f, matCalle, mAdoquin);
         }
-        // Césped bajo cada solar, con borde de piedra
-        foreach (Vector3 s in Solares)
+        // Césped bajo cada solar, con borde de piedra; cada parcela con su giro y tamaño (nada perfectamente alineado)
+        for (int i = 0; i < Solares.Length; i++)
         {
-            Pieza(PrimitiveType.Cube, "Borde jardín", s + new Vector3(0, 0.06f, 0), new Vector3(9.8f, 0.09f, 9.8f), Paleta.Hex("E4D9C8"));
-            Losa("Jardín", s + new Vector3(0, 0.08f, 0), new Vector3(9.4f, 0.09f, 9.4f), texCesped, 4f);
+            Vector3 s = Curva(Solares[i]);
+            float t = 9.4f + ((i * 5) % 3 - 1) * 0.5f;
+            Quaternion g = Quaternion.Euler(0, GiroSolar(i), 0);
+            Pieza(PrimitiveType.Cube, "Borde jardín", s + new Vector3(0, 0.06f, 0), new Vector3(t + 0.4f, 0.09f, t + 0.4f), Paleta.Hex("E4D9C8")).transform.localRotation = g;
+            Losa("Jardín", s + new Vector3(0, 0.08f, 0), new Vector3(t, 0.09f, t), texCesped, mCesped * 0.6f).transform.localRotation = g;
         }
     }
 
@@ -189,7 +200,7 @@ public partial class Ciudad3D
         Color hierro = Paleta.Hex("3E4B4A");
         Transform f = new GameObject("Farola").transform;
         f.SetParent(transform, false);
-        f.localPosition = p;
+        f.localPosition = Curva(p);
         Pieza(PrimitiveType.Cylinder, "Base", new Vector3(0, 0.2f, 0), new Vector3(0.42f, 0.2f, 0.42f), hierro, f);
         Pieza(PrimitiveType.Cylinder, "Poste", new Vector3(0, 1.7f, 0), new Vector3(0.16f, 1.5f, 0.16f), hierro, f);
         Pieza(PrimitiveType.Cube, "Soporte", new Vector3(0, 3.25f, 0), new Vector3(0.5f, 0.1f, 0.5f), hierro, f);
@@ -209,7 +220,7 @@ public partial class Ciudad3D
     {
         Transform b = new GameObject("Banco").transform;
         b.SetParent(transform, false);
-        b.localPosition = p;
+        b.localPosition = Curva(p);
         b.localRotation = Quaternion.Euler(0, giro, 0);
         Color madera = Paleta.Hex("C98B57"), hierro = Paleta.Hex("3E4B4A");
         Pieza(PrimitiveType.Cube, "Asiento", new Vector3(0, 0.5f, 0), new Vector3(1.8f, 0.1f, 0.55f), madera, b);
@@ -224,7 +235,7 @@ public partial class Ciudad3D
     {
         Transform m = new GameObject("Maceta").transform;
         m.SetParent(transform, false);
-        m.localPosition = p;
+        m.localPosition = Curva(p);
         Pieza(PrimitiveType.Cylinder, "Tiesto", new Vector3(0, 0.3f, 0), new Vector3(0.75f, 0.3f, 0.75f), Paleta.Hex("D7845A"), m);
         Pieza(PrimitiveType.Cylinder, "Tierra", new Vector3(0, 0.61f, 0), new Vector3(0.66f, 0.02f, 0.66f), Paleta.Hex("7A5A40"), m);
         Pieza(PrimitiveType.Sphere, "Mata", new Vector3(-0.05f, 0.8f, 0), new Vector3(0.75f, 0.55f, 0.75f), Paleta.Hex("7DBA4E"), m);
@@ -234,7 +245,7 @@ public partial class Ciudad3D
     private static readonly string[] Hojas = { "8CC65A", "7DBA4E", "98CF62", "84C257" };
 
     /// <summary>Árbol redondo y suave (copa de varias esferas), como los de la imagen de referencia.</summary>
-    private void Arbol(Vector3 p, int k, float tam = 3.4f) { ArbolEn(transform, p, k, tam); }
+    private void Arbol(Vector3 p, int k, float tam = 3.4f) { ArbolEn(transform, Curva(p), k, tam); }
 
     private void ArbolEn(Transform padre, Vector3 p, int k, float tam)
     {
@@ -263,7 +274,7 @@ public partial class Ciudad3D
     {
         Transform t = new GameObject("Arbusto").transform;
         t.SetParent(transform, false);
-        t.localPosition = p;
+        t.localPosition = Curva(p);
         Color c = Color.Lerp(Paleta.Hex(Hojas[(k + 1) % Hojas.Length]), Color.black, 0.06f);
         Pieza(PrimitiveType.Sphere, "Mata", new Vector3(0, 0.45f, 0), new Vector3(1.3f, 0.95f, 1.2f), c, t);
         Pieza(PrimitiveType.Sphere, "Mata", new Vector3(0.6f, 0.35f, 0.2f), new Vector3(0.9f, 0.7f, 0.9f), Color.Lerp(c, Color.white, 0.1f), t);
@@ -328,18 +339,22 @@ public partial class Ciudad3D
         float z = -Paso * 2f - 7.5f;
         float ancho = 6f;
         Color orilla = Paleta.Hex("D9CDBA");
-        Pieza(PrimitiveType.Cube, "Lecho", new Vector3(0, -0.12f, z), new Vector3(150f, 0.1f, ancho + 1.2f), Paleta.Hex("6FB6DB"));
-        GameObject agua = Pieza(PrimitiveType.Cube, "Agua", new Vector3(0, -0.02f, z), new Vector3(150f, 0.06f, ancho), Paleta.Hex("8FD0EE"));
-        agua.GetComponent<Renderer>().sharedMaterial.SetFloat("_Smoothness", 0.75f);
-        Pieza(PrimitiveType.Cube, "Orilla", new Vector3(0, 0.08f, z + ancho * 0.5f + 0.35f), new Vector3(150f, 0.3f, 0.7f), orilla);
-        Pieza(PrimitiveType.Cube, "Orilla", new Vector3(0, 0.08f, z - ancho * 0.5f - 0.35f), new Vector3(150f, 0.3f, 0.7f), orilla);
+        // El río sigue la misma deformación que las calles: serpentea y los puentes caen justo en los cruces
+        List<Vector3> linea = LineaCurva(new Vector3(-80f, 0, z), new Vector3(80f, 0, z), 2f);
+        Cinta("Orilla", linea, ancho + 1.6f, 0.012f, Mat(orilla), 4f);
+        Material matAgua = new Material(Mat(Paleta.Hex("8FD0EE")));
+        matAgua.SetFloat("_Smoothness", 0.75f);
+        Cinta("Agua", linea, ancho, 0.022f, matAgua, 4f);
         for (int i = 0; i < 9; i++)
-            Modelo("Ciudad/Naturaleza/" + (i % 2 == 0 ? "lily_large" : "lily_small"), transform, new Vector3(-40f + i * 9.7f, 0.03f, z + ((i * 13) % 5 - 2f) * 0.8f), 0.9f, i * 40f);
+            Modelo("Ciudad/Naturaleza/" + (i % 2 == 0 ? "lily_large" : "lily_small"), transform, Curva(new Vector3(-40f + i * 9.7f, 0.04f, z + ((i * 13) % 5 - 2f) * 0.8f)), 0.9f, i * 40f);
         foreach (float c in new[] { -Paso * 0.5f, Paso * 0.5f })
         {
             Transform p = new GameObject("Puente").transform;
             p.SetParent(transform, false);
-            p.localPosition = new Vector3(c, 0, z);
+            p.localPosition = Curva(new Vector3(c, 0, z));
+            Vector3 dir = Curva(new Vector3(c, 0, z + 1f)) - Curva(new Vector3(c, 0, z - 1f));
+            dir.y = 0;
+            p.localRotation = Quaternion.LookRotation(dir.normalized);
             Color piedra = Paleta.Hex("CFC4B4");
             Pieza(PrimitiveType.Cube, "Tablero", new Vector3(0, 0.35f, 0), new Vector3(4.6f, 0.3f, ancho + 2.2f), piedra, p);
             Pieza(PrimitiveType.Cube, "Pretil", new Vector3(-2.2f, 0.85f, 0), new Vector3(0.35f, 0.8f, ancho + 2.2f), Paleta.Hex("E3D9CA"), p);

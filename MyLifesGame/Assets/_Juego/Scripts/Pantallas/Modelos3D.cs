@@ -16,6 +16,16 @@ public static class Modelos3D
     /// <summary>Cuánta luz propia llevan los modelos generados (0 = ninguna).</summary>
     public static float Brillo = 0.35f;
 
+    // Con "Enter Play Mode" sin recarga de dominio, lo estático sobrevive entre partidas en el editor y
+    // guardaría materiales ya destruidos (se verían rosas): se vacía al empezar cada partida.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void Reiniciar()
+    {
+        cache.Clear();
+        mates.Clear();
+        litUrp = null;
+    }
+
     /// <summary>¿Hay modelo con ese nombre? (p. ej. "edificio_gimnasio").</summary>
     public static bool Existe(string nombre)
     {

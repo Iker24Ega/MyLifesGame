@@ -18,75 +18,99 @@ public class PantallaCiudad : Pantalla
     private readonly RectTransform guia;
     private readonly Image fondoAyuda;
     private readonly Image pildoraZoom;
+    private RawImage cara;
 
     public PantallaCiudad(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla ciudad", 0, true)
     {
-        // Cabecera: nivel, XP, reloj y monedas
-        RectTransform filaCab = UIFabrica.Fila(columna, "Cabecera", 120);
-        Image cab = Tarjeta(filaCab);
-        Image retrato = UIFabrica.Caja(cab.transform, "Retrato", Paleta.Hex("FFE7C2"));
+        // Cabecera compacta como en la imagen de Flow: píldora con retrato redondo, nivel y XP a la izquierda;
+        // monedas y ajustes a la derecha; el reloj del día, pequeño, debajo de las monedas.
+        RectTransform filaCab = UIFabrica.Fila(columna, "Cabecera", 112);
+        Image pildoraNivel = UIFabrica.Caja(filaCab, "Nivel", Paleta.Tarjeta);
+        UIFabrica.Anclar(pildoraNivel.rectTransform, 0.12f, 0.2f, 0.5f, 0.8f);
+        UIFabrica.Sombra(pildoraNivel, 4f, 0.15f);
+        Image aro = UIFabrica.Caja(filaCab, "Aro", Paleta.Blanco);
+        aro.sprite = UIFabrica.Circulo; aro.type = Image.Type.Simple;
+        aro.rectTransform.anchorMin = aro.rectTransform.anchorMax = new Vector2(0, 0.5f);
+        aro.rectTransform.sizeDelta = new Vector2(112, 112);
+        aro.rectTransform.anchoredPosition = new Vector2(64, 0);
+        UIFabrica.Sombra(aro, 4f, 0.18f);
+        Image retrato = UIFabrica.Caja(aro.transform, "Retrato", Paleta.Hex("FFE7C2"));
         retrato.sprite = UIFabrica.Circulo; retrato.type = Image.Type.Simple;
-        retrato.rectTransform.anchorMin = retrato.rectTransform.anchorMax = new Vector2(0, 0.5f);
-        retrato.rectTransform.sizeDelta = new Vector2(96, 96);
-        retrato.rectTransform.anchoredPosition = new Vector2(70, 0);
+        UIFabrica.Anclar(retrato.rectTransform, 0.06f, 0.06f, 0.94f, 0.94f);
         retrato.gameObject.AddComponent<Mask>().showMaskGraphic = true;
         var cara = new GameObject("Cara 3D", typeof(RectTransform)).AddComponent<RawImage>();
         cara.transform.SetParent(retrato.transform, false);
         cara.texture = EstudioAvatar.Textura;
         cara.uvRect = new Rect(0.22f, 0.5f, 0.56f, 0.45f);
+        this.cara = cara;
         cara.raycastTarget = false;
         UIFabrica.Anclar(cara.rectTransform, 0, 0, 1, 1);
-        Image aro = UIFabrica.Caja(cab.transform, "Aro", Paleta.Coral);
-        aro.sprite = UIFabrica.Circulo; aro.type = Image.Type.Simple;
-        aro.rectTransform.anchorMin = aro.rectTransform.anchorMax = new Vector2(0, 0.5f);
-        aro.rectTransform.sizeDelta = new Vector2(104, 104);
-        aro.rectTransform.anchoredPosition = new Vector2(70, 0);
-        aro.transform.SetSiblingIndex(retrato.transform.GetSiblingIndex());
-        nivel = UIFabrica.Texto(cab.transform, "", 34, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
-        UIFabrica.Anclar(nivel.rectTransform, 0.15f, 0.5f, 0.45f, 0.95f);
-        Image fondoXp = UIFabrica.Caja(cab.transform, "Fondo XP", Paleta.Gris);
-        UIFabrica.Anclar(fondoXp.rectTransform, 0.15f, 0.2f, 0.42f, 0.38f);
-        barraXp = UIFabrica.Caja(fondoXp.transform, "XP", Paleta.Hex("E3B341"));
+        nivel = UIFabrica.Texto(pildoraNivel.transform, "", 30, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
+        UIFabrica.Anclar(nivel.rectTransform, 0.36f, 0.48f, 0.97f, 0.98f);
+        Image fondoXp = UIFabrica.Caja(pildoraNivel.transform, "Fondo XP", Paleta.Gris);
+        UIFabrica.Anclar(fondoXp.rectTransform, 0.36f, 0.2f, 0.9f, 0.4f);
+        barraXp = UIFabrica.Caja(fondoXp.transform, "XP", Paleta.Hex("5BC0B5"));
         barraXp.type = Image.Type.Filled; barraXp.fillMethod = Image.FillMethod.Horizontal; barraXp.sprite = UIFabrica.Plano;
         UIFabrica.Anclar(barraXp.rectTransform, 0, 0, 1, 1);
-        reloj = UIFabrica.Texto(cab.transform, "", 40, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        UIFabrica.Anclar(reloj.rectTransform, 0.43f, 0, 0.73f, 1);
-        Image pildora = UIFabrica.Caja(cab.transform, "Monedas", Paleta.Hex("FFE7A8"));
-        UIFabrica.Anclar(pildora.rectTransform, 0.73f, 0.2f, 0.97f, 0.8f);
+
+        Image pildora = UIFabrica.Caja(filaCab, "Monedas", Paleta.Tarjeta);
+        UIFabrica.Anclar(pildora.rectTransform, 0.62f, 0.38f, 0.86f, 0.92f);
+        UIFabrica.Sombra(pildora, 4f, 0.15f);
         Image moneda = UIFabrica.Caja(pildora.transform, "Moneda", Paleta.Hex("E3B341"));
         moneda.sprite = UIFabrica.Circulo; moneda.type = Image.Type.Simple;
         moneda.rectTransform.anchorMin = moneda.rectTransform.anchorMax = new Vector2(0, 0.5f);
-        moneda.rectTransform.sizeDelta = new Vector2(44, 44);
-        moneda.rectTransform.anchoredPosition = new Vector2(34, 0);
-        monedas = UIFabrica.Texto(pildora.transform, "", 32, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        UIFabrica.Anclar(monedas.rectTransform, 0.3f, 0, 0.95f, 1);
+        moneda.rectTransform.sizeDelta = new Vector2(42, 42);
+        moneda.rectTransform.anchoredPosition = new Vector2(32, 0);
+        Image brilloMoneda = UIFabrica.Caja(moneda.transform, "Brillo", Paleta.Hex("F7D774"));
+        brilloMoneda.sprite = UIFabrica.Circulo; brilloMoneda.type = Image.Type.Simple;
+        UIFabrica.Anclar(brilloMoneda.rectTransform, 0.2f, 0.2f, 0.8f, 0.8f);
+        monedas = UIFabrica.Texto(pildora.transform, "", 30, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(monedas.rectTransform, 0.32f, 0, 0.96f, 1);
+        reloj = UIFabrica.Texto(filaCab, "", 22, Paleta.TextoSuave, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(reloj.rectTransform, 0.58f, 0, 0.9f, 0.36f);
 
-        // Las cinco áreas como medidores redondos (tocar abre "Tu equilibrio")
-        RectTransform filaAreas = UIFabrica.Fila(columna, "Áreas", 130);
+        Button ajustes = UIFabrica.Boton(filaCab, "", Paleta.Tarjeta, Paleta.Texto, 10, () => this.juego.IrAPestana(3));
+        RectTransform ra = (RectTransform)ajustes.transform;
+        ra.anchorMin = ra.anchorMax = new Vector2(1, 0.65f);
+        ra.sizeDelta = new Vector2(76, 76);
+        ra.anchoredPosition = new Vector2(-46, 0);
+        Image fa = ajustes.GetComponent<Image>();
+        if (fa != null) { fa.sprite = UIFabrica.Circulo; fa.type = Image.Type.Simple; UIFabrica.Sombra(fa, 4f, 0.15f); }
+        RectTransform zg = UIFabrica.Crear("Engranaje", ra);
+        UIFabrica.Anclar(zg, 0.18f, 0.18f, 0.82f, 0.82f);
+        FormasUI engranaje = FormasUI.En(zg.gameObject);
+        engranaje.raycastTarget = false;
+        Engranaje(engranaje, Paleta.Texto);
+
+        // Las cinco áreas en una píldora blanca: círculos de color con su icono (el anillo muestra el valor).
+        // Tocar abre "Tu equilibrio".
+        RectTransform filaAreas = UIFabrica.Fila(columna, "Áreas", 124);
         Button areas = UIFabrica.Boton(filaAreas, "", Paleta.Tarjeta, Paleta.Texto, 10, () => this.juego.IrAEquilibrio());
-        UIFabrica.Anclar((RectTransform)areas.transform, 0.08f, 0, 0.92f, 1);
+        UIFabrica.Anclar((RectTransform)areas.transform, 0.1f, 0, 0.9f, 1);
+        Image fondoAreas = areas.GetComponent<Image>();
+        if (fondoAreas != null) UIFabrica.Sombra(fondoAreas, 4f, 0.15f);
         foreach (Area area in Areas.Todas)
         {
             int i = (int)area;
             RectTransform hueco = UIFabrica.Crear("Medidor " + i, areas.transform);
-            hueco.anchorMin = hueco.anchorMax = new Vector2((i + 0.5f) / 5f, 0.58f);
-            hueco.sizeDelta = new Vector2(92, 92);
+            hueco.anchorMin = hueco.anchorMax = new Vector2((i + 0.5f) / 5f, 0.6f);
+            hueco.sizeDelta = new Vector2(78, 78);
             Image fondoAnillo = UIFabrica.Caja(hueco, "Fondo", Paleta.Gris);
             fondoAnillo.sprite = UIFabrica.Circulo; fondoAnillo.type = Image.Type.Simple;
             UIFabrica.Anclar(fondoAnillo.rectTransform, 0, 0, 1, 1);
-            rellenos[i] = UIFabrica.Caja(hueco, "Anillo", Paleta.DeArea(area));
+            rellenos[i] = UIFabrica.Caja(hueco, "Anillo", Color.Lerp(Paleta.DeArea(area), Color.black, 0.15f));
             rellenos[i].sprite = UIFabrica.Circulo;
             rellenos[i].type = Image.Type.Filled;
             rellenos[i].fillMethod = Image.FillMethod.Radial360;
             rellenos[i].fillOrigin = (int)Image.Origin360.Top;
             UIFabrica.Anclar(rellenos[i].rectTransform, 0, 0, 1, 1);
-            Image separador = UIFabrica.Caja(hueco, "Separador", Paleta.Tarjeta);
-            separador.sprite = UIFabrica.Circulo; separador.type = Image.Type.Simple;
-            UIFabrica.Anclar(separador.rectTransform, 0.1f, 0.1f, 0.9f, 0.9f);
-            FormasUI icono = Iconos.Crear(hueco, area, 66f);
+            Image centro = UIFabrica.Caja(hueco, "Centro", Paleta.DeArea(area));
+            centro.sprite = UIFabrica.Circulo; centro.type = Image.Type.Simple;
+            UIFabrica.Anclar(centro.rectTransform, 0.1f, 0.1f, 0.9f, 0.9f);
+            FormasUI icono = Iconos.Crear(hueco, area, 58f);
             icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-            Text n = UIFabrica.Texto(areas.transform, Areas.Nombre(area), 20, Paleta.TextoSuave, TextAnchor.MiddleCenter, FontStyle.Bold);
-            n.rectTransform.anchorMin = n.rectTransform.anchorMax = new Vector2((i + 0.5f) / 5f, 0.12f);
+            Text n = UIFabrica.Texto(areas.transform, Areas.Nombre(area), 20, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+            n.rectTransform.anchorMin = n.rectTransform.anchorMax = new Vector2((i + 0.5f) / 5f, 0.13f);
             n.rectTransform.sizeDelta = new Vector2(120, 30);
         }
 
@@ -147,6 +171,15 @@ public class PantallaCiudad : Pantalla
         UIFabrica.Anclar((RectTransform)menos.transform, 0.06f, 0.03f, 0.94f, 0.48f);
     }
 
+    /// <summary>Engranaje de ajustes dibujado con formas (dientes, aro y agujero).</summary>
+    private static void Engranaje(FormasUI f, Color c)
+    {
+        f.Limpiar();
+        for (int i = 0; i < 4; i++) f.Rect(Vector2.zero, new Vector2(0.34f, 1.75f), i * 45f, c);
+        f.Circulo(Vector2.zero, 0.66f, c);
+        f.Circulo(Vector2.zero, 0.28f, Paleta.Tarjeta);
+    }
+
     public bool GuiaVisible { get { return guia.gameObject.activeSelf; } }
     public bool HojaAbierta { get { return hoja.gameObject.activeSelf; } }
     public float AltoHoja { get { return hoja.sizeDelta.y; } }
@@ -160,6 +193,8 @@ public class PantallaCiudad : Pantalla
     {
         Progreso pr = juego.Progreso;
         pildoraZoom.gameObject.SetActive(!HojaAbierta && !GuiaVisible);
+        // El personaje generado tiene la cabeza a tamaño normal (no chibi): se encuadra más arriba y más cerca
+        if (cara != null) cara.uvRect = Avatar3D.UsaGenerado ? new Rect(0.35f, 0.7f, 0.3f, 0.26f) : new Rect(0.22f, 0.5f, 0.56f, 0.45f);
         nivel.text = "Nv. " + pr.Nivel;
         if (pr.Nivel != nivelBarrios) { nivelBarrios = pr.Nivel; juego.Ciudad.ActualizarBarrios(pr.Nivel); }
         barraXp.fillAmount = pr.XpEnNivel / (float)Progreso.XpPorNivel;

@@ -32,8 +32,8 @@ public static class EstudioAvatar
         textura = new RenderTexture(768, 960, 24, RenderTextureFormat.ARGB32) { name = "Retrato avatar", antiAliasing = 4 };
         camara = new GameObject("Cámara estudio").AddComponent<Camera>();
         camara.transform.SetParent(raiz, false);
-        camara.transform.localPosition = new Vector3(0, 2.3f, 8.2f);
-        camara.transform.LookAt(Lugar + new Vector3(0, 1.85f, 0));
+        camara.transform.localPosition = new Vector3(0, 2.6f, 9.4f);
+        camara.transform.LookAt(Lugar + new Vector3(0, 2.05f, 0));
         camara.fieldOfView = 30f;
         camara.clearFlags = CameraClearFlags.SolidColor;
         camara.backgroundColor = new Color(0, 0, 0, 0);

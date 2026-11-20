@@ -1,21 +1,45 @@
 using MyLifesGame.Motor;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 
 /// <summary>
-/// Avatar chibi 3D hecho con primitivas (sudadera con capucha, mochila, pelo, mejillas) y su animación
-/// procedural de andar y reposo según el estado. Lo usan la ciudad y el estudio de retrato.
+/// Avatar del jugador: personaje 3D con esqueleto y animaciones reales (Quaternius, CC0, "Resources/Personajes/Chico"),
+/// recoloreado con la paleta de la hoja de personaje (sudadera turquesa, vaqueros, zapatillas blancas, mochila gris)
+/// y con proporciones chibi (cabeza más grande). Las acciones sin animación propia (sentarse, meditar, pesas)
+/// se posan girando huesos encima de la animación base. Lo usan la ciudad y el estudio de retrato.
 /// </summary>
 public class Avatar3D : MonoBehaviour
 {
     public bool Caminando;
     /// <summary>Acción que está haciendo (id de la tabla: entrenar, estudiar, quedar...). Vacío: ninguna.</summary>
     public string Accion = "";
-    private GameObject pesaI, pesaD, libro, mando, asiento;
-    private Transform cuerpo, brazoI, brazoD, piernaI, piernaD;
-    private Renderer[] sudadera;
+
+    /// <summary>Altura del personaje en unidades del mundo (la ciudad y los retratos están pensados para ~4).</summary>
+    public const float Altura = 3.9f;
+    private const float EscalaCabeza = 1.6f;
+    private const float EscalaPiernas = 0.82f;
+    private const float EscalaBrazos = 0.9f;
+    private float caida;
+    private int fotogramas;
+
+    private Transform modelo;
+    private Animator animador;
+    private PlayableGraph grafo;
+    private AnimationMixerPlayable mezcla;
+    private readonly Dictionary<string, AnimationClip> clips = new Dictionary<string, AnimationClip>();
+    private string clipActual;
+    private float fundido = 1f, duracionFundido = 0.25f;
+
+    private Transform cabeza, cuello, pecho, cadera, brazoI, brazoD, codoI, codoD, munecaI, munecaD, musloI, musloD, rodillaI, rodillaD, pieI, pieD;
+    private float escala = 1f, alturaTobillo;
+    private readonly List<Material> sudadera = new List<Material>();
+    private Transform mochila, pesaI, pesaD, libro, mando, asiento;
     private TipoEstadoAvatar estadoAvatar = TipoEstadoAvatar.Normal;
     private static readonly Dictionary<Color, Material> materiales = new Dictionary<Color, Material>();
+
+    public static readonly Color ColorSudadera = Paleta.Hex("3FA59E");
 
     public static Avatar3D Crear(Transform padre, int capa = 0)
     {
@@ -27,227 +51,557 @@ public class Avatar3D : MonoBehaviour
         return a;
     }
 
+    // ---------------------------------------------------------------- construcción
+
     private void Construir()
     {
-        cuerpo = new GameObject("Cuerpo").transform;
-        cuerpo.SetParent(transform, false);
-        cuerpo.localScale = Vector3.one * 1.45f; // grande y legible (decisión de diseño)
+        GameObject prefab = Resources.Load<GameObject>("Personajes/Chico");
+        if (prefab == null) { Debug.LogError("[Avatar] Falta Resources/Personajes/Chico"); return; }
+        GameObject go = Instantiate(prefab, transform, false);
+        go.name = "Modelo";
+        modelo = go.transform;
+        foreach (Collider c in go.GetComponentsInChildren<Collider>()) Destroy(c);
 
-        Color sud = Paleta.Hex("2FA3A0");
-        piernaI = Articulacion("Pierna I", new Vector3(-0.2f, 0.75f, 0));
-        piernaD = Articulacion("Pierna D", new Vector3(0.2f, 0.75f, 0));
-        Pieza(PrimitiveType.Capsule, "Pierna", new Vector3(0, -0.38f, 0), new Vector3(0.3f, 0.38f, 0.3f), Paleta.Vaquero, piernaI);
-        Pieza(PrimitiveType.Capsule, "Pierna", new Vector3(0, -0.38f, 0), new Vector3(0.3f, 0.38f, 0.3f), Paleta.Vaquero, piernaD);
-        Pieza(PrimitiveType.Cube, "Zapatilla", new Vector3(0, -0.72f, 0.06f), new Vector3(0.28f, 0.14f, 0.42f), Paleta.Blanco, piernaI);
-        Pieza(PrimitiveType.Cube, "Zapatilla", new Vector3(0, -0.72f, 0.06f), new Vector3(0.28f, 0.14f, 0.42f), Paleta.Blanco, piernaD);
+        cabeza = Hueso("Head"); cuello = Hueso("Neck"); pecho = Hueso("Chest"); cadera = Hueso("Hips");
+        brazoI = Hueso("UpperArm.L"); brazoD = Hueso("UpperArm.R"); codoI = Hueso("LowerArm.L"); codoD = Hueso("LowerArm.R");
+        munecaI = Hueso("Wrist.L"); munecaD = Hueso("Wrist.R");
+        musloI = Hueso("UpperLeg.L"); musloD = Hueso("UpperLeg.R"); rodillaI = Hueso("LowerLeg.L"); rodillaD = Hueso("LowerLeg.R");
+        pieI = Hueso("Foot.L"); pieD = Hueso("Foot.R");
 
-        var torso = Pieza(PrimitiveType.Capsule, "Sudadera", new Vector3(0, 1.2f, 0), new Vector3(0.82f, 0.5f, 0.62f), sud, cuerpo);
-        var capucha = Pieza(PrimitiveType.Sphere, "Capucha", new Vector3(0, 1.62f, -0.2f), new Vector3(0.62f, 0.3f, 0.42f), sud, cuerpo);
-        brazoI = Articulacion("Brazo I", new Vector3(-0.47f, 1.52f, 0));
-        brazoD = Articulacion("Brazo D", new Vector3(0.47f, 1.52f, 0));
-        var mangaI = Pieza(PrimitiveType.Capsule, "Manga", new Vector3(0, -0.32f, 0), new Vector3(0.24f, 0.34f, 0.24f), sud, brazoI);
-        var mangaD = Pieza(PrimitiveType.Capsule, "Manga", new Vector3(0, -0.32f, 0), new Vector3(0.24f, 0.34f, 0.24f), sud, brazoD);
-        Pieza(PrimitiveType.Sphere, "Mano", new Vector3(0, -0.68f, 0), Vector3.one * 0.2f, Paleta.Piel, brazoI);
-        Pieza(PrimitiveType.Sphere, "Mano", new Vector3(0, -0.68f, 0), Vector3.one * 0.2f, Paleta.Piel, brazoD);
-        sudadera = new[] { torso.GetComponent<Renderer>(), capucha.GetComponent<Renderer>(), mangaI.GetComponent<Renderer>(), mangaD.GetComponent<Renderer>() };
-        foreach (Renderer r in sudadera) r.material = new Material(Mat(sud));
+        Recolorear();
 
-        Pieza(PrimitiveType.Cube, "Mochila", new Vector3(0, 1.25f, -0.42f), new Vector3(0.66f, 0.72f, 0.3f), Paleta.Mochila, cuerpo);
-        Pieza(PrimitiveType.Cube, "Bolsillo", new Vector3(0, 1.1f, -0.58f), new Vector3(0.46f, 0.3f, 0.06f), Paleta.Hex("5C616B"), cuerpo);
-        Pieza(PrimitiveType.Sphere, "Cabeza", new Vector3(0, 2.1f, 0), new Vector3(0.95f, 0.92f, 0.9f), Paleta.Piel, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Pelo", new Vector3(0, 2.34f, -0.06f), new Vector3(1f, 0.62f, 0.98f), Paleta.Pelo, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Flequillo", new Vector3(0.12f, 2.42f, 0.32f), new Vector3(0.62f, 0.22f, 0.32f), Paleta.Pelo, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Ojo", new Vector3(-0.17f, 2.1f, 0.42f), new Vector3(0.12f, 0.16f, 0.06f), Paleta.Texto, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Ojo", new Vector3(0.17f, 2.1f, 0.42f), new Vector3(0.12f, 0.16f, 0.06f), Paleta.Texto, cuerpo);
-        Pieza(PrimitiveType.Sphere, "Mejilla", new Vector3(-0.3f, 1.98f, 0.36f), new Vector3(0.14f, 0.08f, 0.04f), Paleta.Hex("F2A08C"), cuerpo);
-        Pieza(PrimitiveType.Sphere, "Mejilla", new Vector3(0.3f, 1.98f, 0.36f), new Vector3(0.14f, 0.08f, 0.04f), Paleta.Hex("F2A08C"), cuerpo);
+        // Escala para que mida "Altura" (contando la cabeza agrandada).
+        modelo.localScale = Vector3.one;
+        modelo.localPosition = Vector3.zero;
+        modelo.localRotation = Quaternion.identity;
+        float alto = AltoModelo();
+        escala = alto > 0.01f ? Altura / alto : 1f;
+        modelo.localScale = new Vector3(1.12f, 1f, 1.12f) * escala;
+        if (pieI != null) alturaTobillo = transform.InverseTransformPoint(pieI.position).y;
+        CrearOjos();
+        if (cabeza != null) cabeza.localScale = Vector3.one * EscalaCabeza;
+        GuardarPies();
+        EscalarExtremidades(EscalaPiernas, EscalaBrazos);
+        SeguirPies();
+        if (pieI != null) caida = alturaTobillo - transform.InverseTransformPoint(pieI.position).y;
+
+        foreach (Renderer r in go.GetComponentsInChildren<Renderer>())
+        {
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            var smr = r as SkinnedMeshRenderer;
+            if (smr != null) smr.updateWhenOffscreen = true;
+        }
+
+        PrepararAnimaciones(go);
         CrearAccesorios();
     }
 
-    private Transform Articulacion(string nombre, Vector3 pos)
+    private Transform Hueso(string nombre)
     {
-        var t = new GameObject(nombre).transform;
-        t.SetParent(cuerpo, false);
-        t.localPosition = pos;
-        return t;
+        foreach (Transform t in modelo.GetComponentsInChildren<Transform>(true))
+            if (t.name == nombre) return t;
+        return null;
+    }
+
+    private float AltoModelo()
+    {
+        float min = float.MaxValue, max = float.MinValue;
+        foreach (Renderer r in modelo.GetComponentsInChildren<Renderer>())
+        {
+            Bounds b = r.bounds;
+            min = Mathf.Min(min, b.min.y); max = Mathf.Max(max, b.max.y);
+        }
+        return max > min ? (max - min) / Mathf.Max(0.0001f, transform.lossyScale.y) : 0f;
+    }
+
+    /// <summary>Colores de la hoja de personaje (bases 5.15): sudadera turquesa, vaqueros, zapatillas blancas, pelo castaño oscuro.</summary>
+    private void Recolorear()
+    {
+        foreach (Renderer r in modelo.GetComponentsInChildren<Renderer>())
+        {
+            Material[] ms = r.sharedMaterials;
+            for (int i = 0; i < ms.Length; i++)
+            {
+                string n = ms[i] != null ? ms[i].name.Replace(" (Instance)", "") : "";
+                bool pies = r.name.Contains("Feet");
+                Color c;
+                switch (n)
+                {
+                    case "Skin": c = r.name.Contains("Legs") ? Paleta.Hex("5A7DB5") : Paleta.Hex("EDB48C"); break;
+                    case "Hair": c = Paleta.Hex("3E2A1E"); break;
+                    case "Eyebrows": c = Paleta.Hex("3E2A1E"); break;
+                    case "Eye": c = Paleta.Hex("2B211C"); break;
+                    case "LightBlue": c = Paleta.Hex("5A7DB5"); break;
+                    case "White": c = Paleta.Hex("F4F2EE"); break;
+                    case "Purple": c = pies ? Paleta.Hex("D9D4CC") : ColorSudadera; break;
+                    default: c = ms[i] != null ? ms[i].color : Color.gray; break;
+                }
+                Material m = NuevoMat(c, n == "Eye" ? 0.6f : 0.15f);
+                if (n == "Purple" && !pies) sudadera.Add(m);
+                ms[i] = m;
+            }
+            r.sharedMaterials = ms;
+        }
+    }
+
+    private static Material NuevoMat(Color color, float brillo)
+    {
+        Shader s = Shader.Find("Universal Render Pipeline/Lit");
+        if (s == null) s = Shader.Find("Standard");
+        var m = new Material(s);
+        m.SetColor("_BaseColor", color);
+        m.color = color;
+        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", brillo);
+        return m;
     }
 
     private static Material Mat(Color color)
     {
         Material m;
         if (materiales.TryGetValue(color, out m) && m != null) return m;
-        Shader s = Shader.Find("Universal Render Pipeline/Lit");
-        if (s == null) s = Shader.Find("Standard");
-        m = new Material(s);
-        m.SetColor("_BaseColor", color);
-        m.color = color;
-        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.12f);
+        m = NuevoMat(color, 0.15f);
         materiales[color] = m;
         return m;
     }
 
-    private GameObject Pieza(PrimitiveType tipo, string nombre, Vector3 pos, Vector3 escala, Color color, Transform padre)
+    private Transform Pieza(PrimitiveType tipo, string nombre, Vector3 pos, Vector3 tam, Color color, Transform padre)
     {
         GameObject go = GameObject.CreatePrimitive(tipo);
         go.name = nombre;
         go.transform.SetParent(padre, false);
         go.transform.localPosition = pos;
-        go.transform.localScale = escala;
+        go.transform.localScale = tam;
         go.GetComponent<Renderer>().sharedMaterial = Mat(color);
         Destroy(go.GetComponent<Collider>());
-        return go;
+        return go.transform;
     }
+
+    private Transform Grupo(string nombre)
+    {
+        var t = new GameObject(nombre).transform;
+        t.SetParent(transform, false);
+        return t;
+    }
+
+    /// <summary>Mochila, pesas, libro, mando y asiento. Cuelgan del avatar y siguen a los huesos en LateUpdate.</summary>
+    private void CrearAccesorios()
+    {
+        float h = Altura;
+        mochila = Grupo("Mochila");
+        Color gris = Paleta.Mochila, grisOscuro = Paleta.Hex("3A3E45");
+        Pieza(PrimitiveType.Cube, "Cuerpo", Vector3.zero, new Vector3(0.29f, 0.32f, 0.13f) * h, gris, mochila);
+        Pieza(PrimitiveType.Sphere, "Tapa", new Vector3(0, 0.15f * h, 0), new Vector3(0.29f, 0.09f, 0.13f) * h, gris, mochila);
+        Pieza(PrimitiveType.Cube, "Bolsillo", new Vector3(0, -0.06f * h, -0.075f * h), new Vector3(0.2f, 0.13f, 0.04f) * h, grisOscuro, mochila);
+        Pieza(PrimitiveType.Cube, "AsaI", new Vector3(-0.1f * h, 0.03f * h, 0.075f * h), new Vector3(0.035f, 0.3f, 0.02f) * h, grisOscuro, mochila);
+        Pieza(PrimitiveType.Cube, "AsaD", new Vector3(0.1f * h, 0.03f * h, 0.075f * h), new Vector3(0.035f, 0.3f, 0.02f) * h, grisOscuro, mochila);
+
+        pesaI = Pesa(); pesaD = Pesa();
+
+        libro = Grupo("Libro");
+        Color azul = Paleta.DeArea(Area.Mente);
+        Pieza(PrimitiveType.Cube, "TapaI", new Vector3(-0.055f * h, 0, 0), new Vector3(0.11f, 0.15f, 0.012f) * h, azul, libro).localRotation = Quaternion.Euler(0, 16, 0);
+        Pieza(PrimitiveType.Cube, "TapaD", new Vector3(0.055f * h, 0, 0), new Vector3(0.11f, 0.15f, 0.012f) * h, azul, libro).localRotation = Quaternion.Euler(0, -16, 0);
+        Pieza(PrimitiveType.Cube, "Hojas", new Vector3(0, 0, -0.008f * h), new Vector3(0.2f, 0.135f, 0.012f) * h, Paleta.Blanco, libro);
+
+        mando = Grupo("Mando");
+        Pieza(PrimitiveType.Cube, "Cuerpo", Vector3.zero, new Vector3(0.14f, 0.035f, 0.065f) * h, Paleta.Hex("3A3F4A"), mando);
+        Pieza(PrimitiveType.Sphere, "Boton", new Vector3(0.04f * h, 0.02f * h, 0), Vector3.one * 0.02f * h, Paleta.Coral, mando);
+
+        asiento = Grupo("Asiento");
+        Pieza(PrimitiveType.Cube, "Asiento", new Vector3(0, -0.05f * h, -0.02f * h), new Vector3(0.42f, 0.1f, 0.36f) * h, Paleta.Hex("D98E5F"), asiento);
+        Pieza(PrimitiveType.Cube, "Respaldo", new Vector3(0, 0.16f * h, -0.2f * h), new Vector3(0.42f, 0.38f, 0.07f) * h, Paleta.Hex("C77D52"), asiento);
+        Pieza(PrimitiveType.Cube, "Base", new Vector3(0, -0.3f * h, -0.02f * h), new Vector3(0.38f, 0.4f, 0.32f) * h, Paleta.Hex("C77D52"), asiento);
+        MostrarAccesorios("");
+    }
+
+    private Transform Pesa()
+    {
+        float h = Altura;
+        Transform g = Grupo("Pesa");
+        Pieza(PrimitiveType.Cylinder, "Barra", Vector3.zero, new Vector3(0.022f, 0.06f, 0.022f) * h, Paleta.Hex("5C616B"), g).localRotation = Quaternion.Euler(0, 0, 90);
+        Pieza(PrimitiveType.Cylinder, "Disco", new Vector3(-0.06f * h, 0, 0), new Vector3(0.07f, 0.016f, 0.07f) * h, Paleta.Hex("3A3F4A"), g).localRotation = Quaternion.Euler(0, 0, 90);
+        Pieza(PrimitiveType.Cylinder, "Disco", new Vector3(0.06f * h, 0, 0), new Vector3(0.07f, 0.016f, 0.07f) * h, Paleta.Hex("3A3F4A"), g).localRotation = Quaternion.Euler(0, 0, 90);
+        return g;
+    }
+
+    private string accionMostrada;
+
+    private static bool EsSentado(string a)
+    {
+        return a == "estudiar" || a == "trabajar" || a == "quedar" || a == "videojuegos" || a == "descansar";
+    }
+
+    private void MostrarAccesorios(string a)
+    {
+        accionMostrada = a;
+        pesaI.gameObject.SetActive(a == "entrenar"); pesaD.gameObject.SetActive(a == "entrenar");
+        libro.gameObject.SetActive(a == "estudiar" || a == "trabajar");
+        mando.gameObject.SetActive(a == "videojuegos");
+        asiento.gameObject.SetActive(EsSentado(a));
+    }
+
+    // ---------------------------------------------------------------- animaciones
+
+    private void PrepararAnimaciones(GameObject go)
+    {
+        foreach (AnimationClip c in Resources.LoadAll<AnimationClip>("Personajes/Chico"))
+        {
+            string n = c.name;
+            int k = n.LastIndexOf('|');
+            if (k >= 0) n = n.Substring(k + 1);
+            if (!clips.ContainsKey(n)) clips[n] = c;
+        }
+        animador = go.GetComponent<Animator>();
+        if (animador == null) animador = go.AddComponent<Animator>();
+        animador.applyRootMotion = false;
+        animador.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        grafo = PlayableGraph.Create("Avatar");
+        grafo.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+        mezcla = AnimationMixerPlayable.Create(grafo, 2);
+        var salida = AnimationPlayableOutput.Create(grafo, "Avatar", animador);
+        salida.SetSourcePlayable(mezcla);
+        grafo.Play();
+        Reproducir("Idle", 0f);
+        if (clips.Count == 0) Debug.LogWarning("[Avatar] El modelo no trae animaciones");
+    }
+
+    private void Reproducir(string nombre, float fundir = 0.25f, float velocidad = 1f)
+    {
+        if (!grafo.IsValid()) return;
+        AnimationClip c;
+        if (!clips.TryGetValue(nombre, out c)) { if (!clips.TryGetValue("Idle", out c)) return; nombre = "Idle"; }
+        if (nombre == clipActual)
+        {
+            Playable p0 = mezcla.GetInput(0);
+            if (p0.IsValid()) p0.SetSpeed(velocidad);
+            return;
+        }
+        Playable viejo = mezcla.GetInput(1);
+        if (viejo.IsValid()) { grafo.Disconnect(mezcla, 1); viejo.Destroy(); }
+        Playable actual = mezcla.GetInput(0);
+        if (actual.IsValid()) { grafo.Disconnect(mezcla, 0); grafo.Connect(actual, 0, mezcla, 1); }
+        var nuevo = AnimationClipPlayable.Create(grafo, c);
+        nuevo.SetSpeed(velocidad);
+        grafo.Connect(nuevo, 0, mezcla, 0);
+        clipActual = nombre;
+        duracionFundido = fundir;
+        fundido = fundir <= 0f ? 1f : 0f;
+        AplicarPesos();
+    }
+
+    private void AplicarPesos()
+    {
+        float w = Mathf.Clamp01(fundido);
+        mezcla.SetInputWeight(0, w);
+        mezcla.SetInputWeight(1, mezcla.GetInput(1).IsValid() ? 1f - w : 0f);
+    }
+
+    private void OnDestroy()
+    {
+        if (grafo.IsValid()) grafo.Destroy();
+    }
+
+    // ---------------------------------------------------------------- API
 
     public void PonerRopa(string colorHex)
     {
-        if (sudadera == null) return;
         Color c = Paleta.Hex(colorHex);
-        foreach (Renderer r in sudadera) { r.material.SetColor("_BaseColor", c); r.material.color = c; }
+        foreach (Material m in sudadera) { m.SetColor("_BaseColor", c); m.color = c; }
     }
 
     public void PonerEstado(TipoEstadoAvatar estado) { estadoAvatar = estado; }
 
     public TipoEstadoAvatar Estado { get { return estadoAvatar; } }
 
-    private void Update() { Animar(); }
+    // ---------------------------------------------------------------- bucle
 
-    private void CrearAccesorios()
+    private void Update()
     {
-        pesaI = Pesa(brazoI); pesaD = Pesa(brazoD);
-        libro = new GameObject("Libro"); libro.transform.SetParent(cuerpo, false);
-        libro.transform.localPosition = new Vector3(0, 1.25f, 0.62f);
-        libro.transform.localRotation = Quaternion.Euler(-35f, 0, 0);
-        Pieza(PrimitiveType.Cube, "Tapa", new Vector3(-0.2f, 0, 0), new Vector3(0.38f, 0.5f, 0.05f), Paleta.DeArea(Area.Mente), libro.transform).transform.localRotation = Quaternion.Euler(0, 18, 0);
-        Pieza(PrimitiveType.Cube, "Tapa", new Vector3(0.2f, 0, 0), new Vector3(0.38f, 0.5f, 0.05f), Paleta.DeArea(Area.Mente), libro.transform).transform.localRotation = Quaternion.Euler(0, -18, 0);
-        Pieza(PrimitiveType.Cube, "Hojas", new Vector3(0, 0, 0.03f), new Vector3(0.7f, 0.44f, 0.04f), Paleta.Blanco, libro.transform);
-        mando = new GameObject("Mando"); mando.transform.SetParent(cuerpo, false);
-        mando.transform.localPosition = new Vector3(0, 1.05f, 0.62f);
-        Pieza(PrimitiveType.Cube, "Cuerpo", Vector3.zero, new Vector3(0.5f, 0.14f, 0.24f), Paleta.Hex("3A3F4A"), mando.transform);
-        Pieza(PrimitiveType.Sphere, "Botón", new Vector3(0.14f, 0.08f, 0), Vector3.one * 0.07f, Paleta.Coral, mando.transform);
-        asiento = new GameObject("Asiento"); asiento.transform.SetParent(transform, false);
-        Pieza(PrimitiveType.Cube, "Asiento", new Vector3(0, 0.36f, -0.3f), new Vector3(1.9f, 0.72f, 1.6f), Paleta.Hex("D98E5F"), asiento.transform);
-        Pieza(PrimitiveType.Cube, "Respaldo", new Vector3(0, 1.15f, -1.05f), new Vector3(1.9f, 1.6f, 0.3f), Paleta.Hex("C77D52"), asiento.transform);
-        MostrarAccesorios("");
-    }
-
-    private GameObject Pesa(Transform brazo)
-    {
-        var g = new GameObject("Pesa"); g.transform.SetParent(brazo, false);
-        g.transform.localPosition = new Vector3(0, -0.7f, 0.05f);
-        Pieza(PrimitiveType.Cylinder, "Barra", Vector3.zero, new Vector3(0.07f, 0.22f, 0.07f), Paleta.Hex("5C616B"), g.transform).transform.localRotation = Quaternion.Euler(0, 0, 90);
-        Pieza(PrimitiveType.Cylinder, "Disco", new Vector3(-0.22f, 0, 0), new Vector3(0.24f, 0.05f, 0.24f), Paleta.Hex("3A3F4A"), g.transform).transform.localRotation = Quaternion.Euler(0, 0, 90);
-        Pieza(PrimitiveType.Cylinder, "Disco", new Vector3(0.22f, 0, 0), new Vector3(0.24f, 0.05f, 0.24f), Paleta.Hex("3A3F4A"), g.transform).transform.localRotation = Quaternion.Euler(0, 0, 90);
-        return g;
-    }
-
-    private string accionMostrada = null;
-
-    private void MostrarAccesorios(string a)
-    {
-        accionMostrada = a;
-        bool sentado = a == "estudiar" || a == "trabajar" || a == "quedar" || a == "videojuegos" || a == "descansar";
-        pesaI.SetActive(a == "entrenar"); pesaD.SetActive(a == "entrenar");
-        libro.SetActive(a == "estudiar" || a == "trabajar");
-        mando.SetActive(a == "videojuegos");
-        asiento.SetActive(sentado);
-    }
-
-    /// <summary>Animación de la acción en curso. Devuelve false si no hay acción.</summary>
-    private bool AnimarAccion(float t)
-    {
-        string a = Accion ?? "";
+        if (modelo == null) return;
+        string a = Caminando ? "" : (Accion ?? "");
         if (a != accionMostrada) MostrarAccesorios(a);
-        if (a == "" ) return false;
-        Quaternion piernasSentado = Quaternion.Euler(-88f, 0, 0);
-        switch (a)
+
+        if (Caminando) Reproducir("Walk", 0.2f, 1.15f);
+        else if (a == "pasear") Reproducir("Walk", 0.25f, 0.9f);
+        else if (a == "quedar") Reproducir("Idle", 0.3f);
+        else if (a == "entrenar" || EsSentado(a) || a == "meditar") Reproducir("Idle_Neutral", 0.3f);
+        else if (estadoAvatar == TipoEstadoAvatar.Cansado || estadoAvatar == TipoEstadoAvatar.Descuidado) Reproducir("Idle_Neutral", 0.4f, 0.7f);
+        else Reproducir("Idle", 0.4f);
+
+        if (fundido < 1f)
         {
-            case "entrenar":
-            {
-                float c = (Mathf.Sin(t * 4.5f) + 1f) * 0.5f;
-                piernaI.localRotation = piernaD.localRotation = Quaternion.identity;
-                brazoI.localRotation = Quaternion.Euler(-20f - c * 110f, 0, 8f);
-                brazoD.localRotation = Quaternion.Euler(-20f - (1f - c) * 110f, 0, -8f);
-                cuerpo.localPosition = new Vector3(0, Mathf.Abs(Mathf.Sin(t * 4.5f)) * 0.04f, 0);
-                cuerpo.localRotation = Quaternion.identity;
-                break;
-            }
-            case "pasear":
-            {
-                float s = Mathf.Sin(t * 7f);
-                piernaI.localRotation = Quaternion.Euler(s * 26f, 0, 0);
-                piernaD.localRotation = Quaternion.Euler(-s * 26f, 0, 0);
-                brazoI.localRotation = Quaternion.Euler(-s * 22f, 0, 6f);
-                brazoD.localRotation = Quaternion.Euler(s * 22f, 0, -6f);
-                cuerpo.localPosition = new Vector3(0, Mathf.Abs(Mathf.Cos(t * 7f)) * 0.08f, 0);
-                cuerpo.localRotation = Quaternion.identity;
-                break;
-            }
-            case "meditar":
-            {
-                float f = Mathf.Sin(t * 1.3f);
-                piernaI.localRotation = Quaternion.Euler(-85f, 0, -38f);
-                piernaD.localRotation = Quaternion.Euler(-85f, 0, 38f);
-                brazoI.localRotation = Quaternion.Euler(-35f, 0, 28f);
-                brazoD.localRotation = Quaternion.Euler(-35f, 0, -28f);
-                cuerpo.localPosition = new Vector3(0, -0.85f + 0.12f + f * 0.06f, 0);
-                cuerpo.localRotation = Quaternion.identity;
-                break;
-            }
-            default:
-            {
-                // Sentado: estudiar, trabajar, quedar, videojuegos, descansar
-                piernaI.localRotation = piernaD.localRotation = piernasSentado;
-                cuerpo.localPosition = new Vector3(0, -0.36f, 0);
-                if (a == "descansar")
-                {
-                    brazoI.localRotation = Quaternion.Euler(0, 0, 12f);
-                    brazoD.localRotation = Quaternion.Euler(0, 0, -12f);
-                    cuerpo.localRotation = Quaternion.Euler(-14f + Mathf.Sin(t * 1.2f) * 1.5f, 0, 0);
-                }
-                else if (a == "quedar")
-                {
-                    brazoI.localRotation = Quaternion.Euler(-10f, 0, 6f);
-                    brazoD.localRotation = Quaternion.Euler(-160f, 0, -25f + Mathf.Sin(t * 6f) * 20f);
-                    cuerpo.localRotation = Quaternion.Euler(0, Mathf.Sin(t * 1.5f) * 6f, 0);
-                }
-                else
-                {
-                    float j = a == "videojuegos" ? Mathf.Sin(t * 14f) * 3f : 0f;
-                    brazoI.localRotation = Quaternion.Euler(-62f + j, 0, -14f);
-                    brazoD.localRotation = Quaternion.Euler(-62f - j, 0, 14f);
-                    cuerpo.localRotation = Quaternion.Euler(6f + Mathf.Sin(t * 1.6f) * 2f, 0, 0);
-                }
-                break;
-            }
+            fundido += Time.deltaTime / Mathf.Max(0.01f, duracionFundido);
+            AplicarPesos();
         }
-        return true;
     }
 
-    private void Animar()
+    /// <summary>Gira un hueso en el espacio del avatar (eje dado en coordenadas del avatar), encima de la animación.</summary>
+    private void Girar(Transform hueso, Vector3 ejeLocal, float grados)
     {
+        if (hueso == null || grados == 0f) return;
+        Vector3 eje = transform.TransformDirection(ejeLocal);
+        hueso.rotation = Quaternion.AngleAxis(grados, eje) * hueso.rotation;
+    }
+
+    private void LateUpdate()
+    {
+        if (modelo == null) return;
         float t = Time.time;
-        if (!Caminando && AnimarAccion(t)) return;
-        if (Caminando)
+        if (cabeza != null) cabeza.localScale = Vector3.one * EscalaCabeza;
+        modelo.localPosition = new Vector3(0, caida, 0);
+        EscalarExtremidades(1f, 1f);
+        GuardarPies();
+        EscalarExtremidades(EscalaPiernas, EscalaBrazos);
+        if (++fotogramas == 30) Diagnostico();
+        string a = Caminando ? "" : (Accion ?? "");
+        Vector3 X = Vector3.right, Y = Vector3.up, Z = Vector3.forward;
+
+        if (a == "")
         {
-            float s = Mathf.Sin(t * 11f);
-            piernaI.localRotation = Quaternion.Euler(s * 32f, 0, 0);
-            piernaD.localRotation = Quaternion.Euler(-s * 32f, 0, 0);
-            brazoI.localRotation = Quaternion.Euler(-s * 28f, 0, 6f);
-            brazoD.localRotation = Quaternion.Euler(s * 28f, 0, -6f);
-            cuerpo.localPosition = new Vector3(0, Mathf.Abs(Mathf.Cos(t * 11f)) * 0.12f, 0);
-            cuerpo.localRotation = Quaternion.identity;
+            // Estados del avatar (bases 5.15): mismo cuerpo, cambia la postura.
+            if (estadoAvatar == TipoEstadoAvatar.Cansado) { Girar(pecho, X, 8f); Girar(cabeza, X, 10f); }
+            else if (estadoAvatar == TipoEstadoAvatar.Descuidado) { Girar(pecho, X, 14f); Girar(cabeza, X, 16f); }
+            else if (estadoAvatar == TipoEstadoAvatar.EnForma && !Caminando) { Girar(pecho, X, -4f); Girar(cabeza, X, -4f); }
         }
-        else
+        else if (a == "entrenar")
         {
-            float respira = Mathf.Sin(t * 2.2f);
-            float inclinacion = estadoAvatar == TipoEstadoAvatar.Cansado ? 9f : estadoAvatar == TipoEstadoAvatar.Descuidado ? 14f : 0f;
-            float brazos = estadoAvatar == TipoEstadoAvatar.EnForma ? 10f : 4f;
-            piernaI.localRotation = piernaD.localRotation = Quaternion.identity;
-            brazoI.localRotation = Quaternion.Euler(0, 0, brazos + respira * 2f);
-            brazoD.localRotation = Quaternion.Euler(0, 0, -brazos - respira * 2f);
-            cuerpo.localPosition = new Vector3(0, respira * 0.02f, 0);
-            cuerpo.localRotation = Quaternion.Euler(inclinacion, 0, 0);
+            // Curl de bíceps alterno con pesas.
+            float c = (Mathf.Sin(t * 4f) + 1f) * 0.5f;
+            Girar(brazoI, X, -12f); Girar(brazoD, X, -12f);
+            Girar(codoI, X, -25f - c * 105f);
+            Girar(codoD, X, -25f - (1f - c) * 105f);
+        }
+        else if (a == "meditar")
+        {
+            float f = Mathf.Sin(t * 1.3f);
+            Girar(musloI, X, -82f); Girar(musloI, Y, -48f);
+            Girar(musloD, X, -82f); Girar(musloD, Y, 48f);
+            Girar(rodillaI, Y, 150f); Girar(rodillaI, X, 12f);
+            Girar(rodillaD, Y, -150f); Girar(rodillaD, X, 12f);
+            Girar(brazoI, X, -20f); Girar(brazoI, Z, -12f); Girar(codoI, X, -50f);
+            Girar(brazoD, X, -20f); Girar(brazoD, Z, 12f); Girar(codoD, X, -50f);
+            Girar(pecho, X, f * 2f);
+            SeguirPies();
+            ApoyarEnSuelo(true);
+        }
+        else if (EsSentado(a))
+        {
+            Girar(musloI, X, -88f); Girar(musloD, X, -88f);
+            Girar(rodillaI, X, 88f); Girar(rodillaD, X, 88f);
+            if (a == "descansar")
+            {
+                Girar(pecho, X, -12f + Mathf.Sin(t * 1.2f) * 1.5f);
+                Girar(cabeza, X, 8f);
+            }
+            else if (a == "quedar")
+            {
+                Girar(brazoD, X, -60f); Girar(brazoD, Z, 40f + Mathf.Sin(t * 6f) * 15f); Girar(codoD, X, -40f);
+                Girar(pecho, Y, Mathf.Sin(t * 1.5f) * 6f);
+            }
+            else
+            {
+                float j = a == "videojuegos" ? Mathf.Sin(t * 14f) * 4f : 0f;
+                Girar(brazoI, X, -38f + j); Girar(brazoD, X, -38f - j);
+                Girar(codoI, X, -55f); Girar(codoD, X, -55f);
+                Girar(pecho, X, 6f + Mathf.Sin(t * 1.6f) * 1.5f);
+                Girar(cabeza, X, 10f);
+            }
+            SeguirPies();
+            ApoyarEnSuelo(false);
+        }
+        SeguirPies();
+        ColocarAccesorios(a);
+    }
+
+    private void EscalarExtremidades(float piernas, float brazos)
+    {
+        if (musloI != null) musloI.localScale = Vector3.one * piernas;
+        if (musloD != null) musloD.localScale = Vector3.one * piernas;
+        if (brazoI != null) brazoI.localScale = Vector3.one * brazos;
+        if (brazoD != null) brazoD.localScale = Vector3.one * brazos;
+    }
+
+    /// <summary>
+    /// Ojos grandes y mejillas estilo chibi (como la hoja de personaje), colocados sobre los ojos del modelo
+    /// y colgados del hueso de la cabeza para que sigan la animación.
+    /// </summary>
+    private void CrearOjos()
+    {
+        if (cabeza == null) return;
+        foreach (SkinnedMeshRenderer smr in modelo.GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            if (!smr.name.Contains("Head") || smr.sharedMesh == null) continue;
+            int hi = System.Array.IndexOf(smr.bones, cabeza);
+            if (hi < 0) continue;
+            Mesh mesh = smr.sharedMesh;
+            Matrix4x4 bp = mesh.bindposes[hi];
+            Vector3 adelante = bp.MultiplyVector(smr.transform.InverseTransformDirection(transform.forward)).normalized;
+            Vector3 arriba = bp.MultiplyVector(smr.transform.InverseTransformDirection(transform.up)).normalized;
+            Vector3 derecha = Vector3.Cross(arriba, adelante).normalized;
+            Material[] ms = smr.sharedMaterials;
+            Vector3[] v = mesh.vertices;
+            for (int sub = 0; sub < mesh.subMeshCount && sub < ms.Length; sub++)
+            {
+                if (ms[sub] == null || ms[sub].color != Paleta.Hex("2B211C")) continue;
+                int[] tri = mesh.GetTriangles(sub);
+                Vector3 cI = Vector3.zero, cD = Vector3.zero; int nI = 0, nD = 0;
+                float alto = 0f;
+                foreach (int k in tri)
+                {
+                    Vector3 pb = bp.MultiplyPoint3x4(v[k]);
+                    if (Vector3.Dot(pb, derecha) < 0) { cI += pb; nI++; } else { cD += pb; nD++; }
+                }
+                if (nI > 0) cI /= nI;
+                if (nD > 0) cD /= nD;
+                foreach (int k in tri)
+                {
+                    Vector3 pb = bp.MultiplyPoint3x4(v[k]);
+                    Vector3 c = Vector3.Dot(pb, derecha) < 0 ? cI : cD;
+                    alto = Mathf.Max(alto, Mathf.Abs(Vector3.Dot(pb - c, arriba)) * 2f);
+                }
+                float L = cabeza.lossyScale.x;
+                if (nI > 0) Ojo(cI, alto * L, adelante, arriba, Vector3.Dot(cI, derecha), L);
+                if (nD > 0) Ojo(cD, alto * L, adelante, arriba, Vector3.Dot(cD, derecha), L);
+                diagOjos = "ojos en hueso: " + cI.ToString("F4") + " " + cD.ToString("F4") + " alto=" + (alto * L).ToString("F3") + " L=" + L;
+                return;
+            }
         }
     }
 
+    private string diagOjos = "sin ojos";
+
+    private void Ojo(Vector3 centroHueso, float altoOjo, Vector3 adelante, Vector3 arriba, float lado, float L)
+    {
+        float h = Altura;
+        Transform t = new GameObject("Ojo").transform;
+        t.SetParent(cabeza, false);
+        t.localRotation = Quaternion.LookRotation(adelante, arriba);
+        t.localScale = Vector3.one / L;
+        t.localPosition = centroHueso + adelante * (0.006f * h / L);
+        float alto = Mathf.Max(altoOjo * 2.1f, 0.03f * h);
+        float ancho = alto * 0.8f;
+        Pieza(PrimitiveType.Sphere, "Pupila", Vector3.zero, new Vector3(ancho, alto, 0.01f * h), Paleta.Hex("2B211C"), t);
+        Pieza(PrimitiveType.Sphere, "Brillo", new Vector3(ancho * 0.2f, alto * 0.22f, 0.005f * h), new Vector3(ancho * 0.38f, alto * 0.32f, 0.004f * h), Paleta.Blanco, t);
+        Pieza(PrimitiveType.Sphere, "Mejilla", new Vector3(Mathf.Sign(lado) * ancho * 0.45f, -alto * 1.0f, -0.006f * h), new Vector3(ancho * 1.1f, alto * 0.42f, 0.005f * h), Paleta.Hex("F6AE98"), t);
+        foreach (Renderer r in t.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    }
+
+    private void Diagnostico()
+    {
+        try
+        {
+            string ruta = System.IO.Path.Combine(Application.dataPath, "..", "Automatizacion", "diag_avatar.txt");
+            string txt = "escala=" + escala + " cabeza.local=" + (cabeza != null ? cabeza.localScale.ToString("F2") : "-")
+                + " cabeza.lossy=" + (cabeza != null ? cabeza.lossyScale.ToString("F3") : "-")
+                + " muslo.lossy=" + (musloI != null ? musloI.lossyScale.ToString("F3") : "-")
+                + " caida=" + caida + " tobillo=" + alturaTobillo + "\n" + diagOjos
+                + "\ncabezaPos=" + (cabeza != null ? transform.InverseTransformPoint(cabeza.position).ToString("F3") : "-")
+                + " cuelloPos=" + (cuello != null ? transform.InverseTransformPoint(cuello.position).ToString("F3") : "-")
+                + " ruta=" + RutaHueso(cabeza)
+                + " ojos=" + OjosDiag()
+                + " smr=" + SmrDiag()
+                + "\nclips=" + string.Join(",", new List<string>(clips.Keys).ToArray()) + "\n";
+            System.IO.File.AppendAllText(ruta, gameObject.name + " " + transform.parent?.name + ": " + txt);
+        }
+        catch { }
+    }
+
+    // Los pies de este esqueleto son controles aparte (no cuelgan de la rodilla): al posar las piernas, hay que llevarlos con la espinilla.
+    private Vector3 pieOffI, pieOffD;
+    private Quaternion pieRotI, pieRotD;
+
+    private void GuardarPies()
+    {
+        if (pieI == null || rodillaI == null || pieD == null || rodillaD == null) return;
+        pieOffI = rodillaI.InverseTransformPoint(pieI.position); pieRotI = Quaternion.Inverse(rodillaI.rotation) * pieI.rotation;
+        pieOffD = rodillaD.InverseTransformPoint(pieD.position); pieRotD = Quaternion.Inverse(rodillaD.rotation) * pieD.rotation;
+    }
+
+    private void SeguirPies()
+    {
+        if (pieI == null || rodillaI == null || pieD == null || rodillaD == null) return;
+        pieI.position = rodillaI.TransformPoint(pieOffI); pieI.rotation = rodillaI.rotation * pieRotI;
+        pieD.position = rodillaD.TransformPoint(pieOffD); pieD.rotation = rodillaD.rotation * pieRotD;
+    }
+
+    private string RutaHueso(Transform t)
+    {
+        string r = "";
+        while (t != null && t != transform) { r = t.name + "/" + r; t = t.parent; }
+        return r;
+    }
+
+    private string OjosDiag()
+    {
+        string r = "";
+        foreach (Transform t in GetComponentsInChildren<Transform>(true))
+            if (t.name == "Pupila") r += transform.InverseTransformPoint(t.position).ToString("F2") + (t.GetComponent<Renderer>().enabled ? "" : "off") + " L" + t.gameObject.layer + " ";
+        return r;
+    }
+
+    private string SmrDiag()
+    {
+        string r = "";
+        foreach (SkinnedMeshRenderer smr in modelo.GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            r += smr.name + "[root=" + (smr.rootBone != null ? smr.rootBone.name : "-") + " huesos=" + smr.bones.Length;
+            if (smr.name.Contains("Head") && smr.sharedMesh != null)
+            {
+                var bw = smr.sharedMesh.GetAllBoneWeights();
+                var cuenta = new Dictionary<string, int>();
+                foreach (var w in bw) { string n = smr.bones[w.boneIndex] != null ? smr.bones[w.boneIndex].name : "?"; int c; cuenta.TryGetValue(n, out c); cuenta[n] = c + 1; }
+                foreach (var kv in cuenta) r += " " + kv.Key + ":" + kv.Value;
+            }
+            r += "] ";
+        }
+        return r;
+    }
+
+    /// <summary>Baja el modelo para que los pies (o las rodillas, al meditar) toquen el suelo después de posar.</summary>
+    private void ApoyarEnSuelo(bool usarRodillas)
+    {
+        float y = float.MaxValue;
+        if (pieI != null) y = Mathf.Min(y, transform.InverseTransformPoint(pieI.position).y - alturaTobillo);
+        if (pieD != null) y = Mathf.Min(y, transform.InverseTransformPoint(pieD.position).y - alturaTobillo);
+        if (usarRodillas)
+        {
+            if (rodillaI != null) y = Mathf.Min(y, transform.InverseTransformPoint(rodillaI.position).y - 0.04f * Altura);
+            if (rodillaD != null) y = Mathf.Min(y, transform.InverseTransformPoint(rodillaD.position).y - 0.04f * Altura);
+        }
+        if (y < float.MaxValue) modelo.localPosition = new Vector3(0, caida - y, 0);
+    }
+
+    private Vector3 Local(Transform hueso) { return transform.InverseTransformPoint(hueso.position); }
+
+    private void ColocarAccesorios(string a)
+    {
+        float h = Altura;
+        if (pecho != null)
+        {
+            Vector3 p = Local(pecho);
+            Quaternion r = Quaternion.Inverse(transform.rotation) * pecho.rotation;
+            // La mochila sigue la inclinación del pecho alrededor del eje lateral.
+            Vector3 arriba = r * Vector3.up;
+            float incl = Mathf.Atan2(arriba.z, arriba.y) * Mathf.Rad2Deg;
+            mochila.localRotation = Quaternion.Euler(incl, 0, 0);
+            mochila.localPosition = p + mochila.localRotation * new Vector3(0, -0.02f * h, -0.115f * h);
+        }
+        if (a == "entrenar" && munecaI != null && munecaD != null)
+        {
+            pesaI.localPosition = Local(munecaI) + new Vector3(0, -0.01f * h, 0.03f * h);
+            pesaD.localPosition = Local(munecaD) + new Vector3(0, -0.01f * h, 0.03f * h);
+        }
+        if ((a == "estudiar" || a == "trabajar" || a == "videojuegos") && munecaI != null && munecaD != null)
+        {
+            Vector3 m = (Local(munecaI) + Local(munecaD)) * 0.5f;
+            libro.localPosition = m + new Vector3(0, 0.05f * h, 0.04f * h);
+            libro.localRotation = Quaternion.Euler(-35f, 0, 0);
+            mando.localPosition = m + new Vector3(0, 0.01f * h, 0.03f * h);
+        }
+        if (EsSentado(a) && cadera != null)
+        {
+            Vector3 c = Local(cadera);
+            asiento.localPosition = new Vector3(0, c.y - 0.03f * h, c.z - 0.02f * h);
+        }
+    }
 }

@@ -14,17 +14,23 @@ using UnityEngine.UI;
 /// que le da el jugador, un barrio decorativo alrededor, luz cálida de tarde, postproceso suave,
 /// pines medallón y el avatar, que camina solo por las calles hasta el edificio elegido.
 /// </summary>
-public class Ciudad3D : MonoBehaviour
+public partial class Ciudad3D : MonoBehaviour
 {
     public static readonly Vector3[] Solares =
     {
-        new Vector3(-14, 0, -14), new Vector3(0, 0, -14), new Vector3(14, 0, -14),
-        new Vector3(-14, 0, 0), new Vector3(14, 0, 0),
-        new Vector3(-14, 0, 14), new Vector3(0, 0, 14), new Vector3(14, 0, 14),
+        new Vector3(-Paso, 0, -Paso), new Vector3(0, 0, -Paso), new Vector3(Paso, 0, -Paso),
+        new Vector3(-Paso, 0, 0), new Vector3(Paso, 0, 0),
+        new Vector3(-Paso, 0, Paso), new Vector3(0, 0, Paso), new Vector3(Paso, 0, Paso),
     };
+    /// <summary>Distancia entre centros de manzana (deja aceras anchas para árboles y farolas).</summary>
+    public const float Paso = 16f;
+    /// <summary>Vista isométrica: la cámara mira la ciudad en diagonal, como en la imagen de referencia.</summary>
+    private const float GiroCamara = 45f;
+    /// <summary>En la ciudad el avatar se ve grande y legible (decisión de diseño 5.11).</summary>
+    public const float EscalaAvatar = 2.1f;
     public const int IndiceCasa = 1;
 
-    private static readonly float[] Calles = { -21f, -7f, 7f, 21f };
+    private static readonly float[] Calles = { -Paso * 1.5f, -Paso * 0.5f, Paso * 0.5f, Paso * 1.5f };
     private const float AnchoSolar = 8.5f;
 
     /// <summary>Se llama al tocar un edificio (índice del solar).</summary>
@@ -38,7 +44,8 @@ public class Ciudad3D : MonoBehaviour
     private Transform avatar;
     private Avatar3D avatar3D;
     private Transform anilloAvatar;
-    private RectTransform burbuja;
+    private RectTransform burbuja, rotuloCamino;
+    private Text textoCamino;
     private FormasUI dibujoEstado;
     private Text textoEstado;
     private TipoEstadoAvatar estadoDibujado = (TipoEstadoAvatar)(-1);
@@ -62,6 +69,7 @@ public class Ciudad3D : MonoBehaviour
         public GameObject medallon;
         public Image fondoMedallon;
         public Text letraMedallon;
+        public FormasUI iconoMedallon;
         public Text etiqueta;
         public GameObject pastilla;
         public float alto = 6f;
@@ -79,22 +87,8 @@ public class Ciudad3D : MonoBehaviour
 
         PrepararCamaraYLuz();
 
-        // Suelo, calles con acera y plaza
-        Pieza(PrimitiveType.Cube, "Césped", new Vector3(0, -0.05f, 0), new Vector3(140, 0.1f, 140), Paleta.Hex("A9CF8E"));
-        foreach (float c in Calles)
-        {
-            Calle(new Vector3(c, 0, 0), true);
-            Calle(new Vector3(0, 0, c), false);
-        }
-        Pieza(PrimitiveType.Cylinder, "Plaza", new Vector3(0, 0.06f, 0), new Vector3(9.5f, 0.06f, 9.5f), Paleta.Hex("EADFCF"));
-        Pieza(PrimitiveType.Cylinder, "Fuente", new Vector3(0, 0.4f, 0), new Vector3(3.6f, 0.35f, 3.6f), Paleta.Hex("F4EEE6"));
-        Pieza(PrimitiveType.Cylinder, "Agua", new Vector3(0, 0.62f, 0), new Vector3(3.1f, 0.06f, 3.1f), Paleta.Hex("8CC7E8"));
-        Pieza(PrimitiveType.Cylinder, "Columna", new Vector3(0, 1.3f, 0), new Vector3(0.55f, 0.75f, 0.55f), Paleta.Hex("F4EEE6"));
-        for (int i = 0; i < 4; i++)
-        {
-            float a = i * Mathf.PI / 2f + Mathf.PI / 4f;
-            Modelo("Ciudad/Suburban/planter", transform, new Vector3(Mathf.Cos(a) * 3.6f, 0.1f, Mathf.Sin(a) * 3.6f), 1.6f, 0f);
-        }
+        SueloYCalles();
+        PlazaFuente();
 
         for (int i = 0; i < Solares.Length; i++)
         {
@@ -110,6 +104,7 @@ public class Ciudad3D : MonoBehaviour
         }
 
         Barrio();
+        Ambiente();
         BarriosBloqueados();
         CrearAvatar();
         avatar.position = solares[datos.edificioActual].Puerta;
@@ -121,10 +116,11 @@ public class Ciudad3D : MonoBehaviour
     {
         camara = Camera.main;
         if (camara == null) camara = new GameObject("Cámara", typeof(Camera)).GetComponent<Camera>();
-        camara.fieldOfView = 42f;
+        camara.fieldOfView = 36f;
         camara.clearFlags = CameraClearFlags.SolidColor;
         camara.backgroundColor = Paleta.Hex("F6E7CF");
         camara.farClipPlane = 400f;
+        camara.nearClipPlane = 1f;
         camara.cullingMask &= ~(1 << EstudioAvatar.Capa);
         var datosCam = camara.GetUniversalAdditionalCameraData();
         if (datosCam != null)
@@ -204,24 +200,17 @@ public class Ciudad3D : MonoBehaviour
         string[] bajos = { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n" };
         string[] casas = { "a", "b", "c", "d", "e", "g", "h", "i", "j", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u" };
         int k = 0;
+        float lejos = Paso * 2f + 4.5f;
         for (int i = -2; i <= 2; i++)
         {
-            float x = i * 14f;
-            Modelo("Ciudad/Suburban/tree-small", transform, new Vector3(x + 3f, 0, -27f), 2.2f, 0f);
-            Decorado(new Vector3(x, 0, 28f), k++, bajos, "Ciudad/Comercial/low-detail-building-", 9f, 180f);
+            float x = i * Paso;
+            Decorado(new Vector3(x, 0, lejos), k++, bajos, "Ciudad/Comercial/low-detail-building-", 9f, 180f);
             if (i > -2 && i < 2)
             {
-                Decorado(new Vector3(-28f, 0, x), k++, bajos, "Ciudad/Comercial/low-detail-building-", 9f, 90f);
-                Decorado(new Vector3(28f, 0, x), k++, casas, "Ciudad/Suburban/building-type-", 7.5f, -90f);
+                Decorado(new Vector3(-lejos, 0, x), k++, casas, "Ciudad/Suburban/building-type-", 8f, 90f);
+                Decorado(new Vector3(lejos, 0, x), k++, casas, "Ciudad/Suburban/building-type-", 8f, -90f);
             }
         }
-        // Árboles a lo largo de las aceras
-        foreach (float c in Calles)
-            for (float d = -24f; d <= 24f; d += 12f)
-            {
-                Modelo("Ciudad/Suburban/tree-small", transform, new Vector3(c + 2.9f, 0, d + 3.5f), 2.2f, 0f);
-                Modelo("Ciudad/Suburban/tree-large", transform, new Vector3(d + 3.5f, 0, c - 2.9f), 2.8f, 0f);
-            }
     }
 
     private void Decorado(Vector3 pos, int k, string[] variantes, string ruta, float ancho, float giro)
@@ -312,11 +301,12 @@ public class Ciudad3D : MonoBehaviour
             s.alto = Mathf.Max(3f, b.max.y);
         }
 
-        s.medallon.transform.localPosition = s.centro + new Vector3(0, s.alto + 2.4f, 0);
+        s.medallon.transform.localPosition = s.centro + new Vector3(0, s.alto + 3f, 0);
         if (rol != null)
         {
             s.fondoMedallon.color = Paleta.DeArea(rol.area);
-            s.letraMedallon.text = rol.nombre.Substring(0, 1);
+            s.letraMedallon.text = "";
+            Iconos.IconoRol(s.iconoMedallon, rolId, Paleta.Blanco);
             s.etiqueta.text = rol.nombre;
             s.pastilla.SetActive(true);
         }
@@ -324,6 +314,7 @@ public class Ciudad3D : MonoBehaviour
         {
             s.fondoMedallon.color = Paleta.Hex("B8AFA3");
             s.letraMedallon.text = "?";
+            s.iconoMedallon.Limpiar();
             s.pastilla.SetActive(false);
         }
     }
@@ -343,13 +334,13 @@ public class Ciudad3D : MonoBehaviour
                 Modelo("Ciudad/Comercial/detail-parasol-b", p, c + new Vector3(2.6f, 0, -4.2f), 1.8f, 0f);
                 break;
             case "biblioteca": Modelo("Ciudad/Comercial/building-e", p, c, AnchoSolar, 180f); break;
-            case "trabajo": Modelo("Ciudad/Comercial/building-skyscraper-a", p, c, AnchoSolar * 0.85f, 180f); break;
+            case "trabajo": Modelo("Ciudad/Comercial/building-g", p, c, AnchoSolar, 180f); break;
             case "recreativos": Modelo("Ciudad/Comercial/building-h", p, c, AnchoSolar, 180f); break;
             case "parque":
                 Pieza(PrimitiveType.Cube, "Césped parque", s.centro + new Vector3(0, 0.03f, 0), new Vector3(9.5f, 0.06f, 9.5f), Paleta.Hex("93C47D"), p);
-                Modelo("Ciudad/Suburban/tree-large", p, s.centro + new Vector3(-2.5f, 0, 2f), 3.6f, 0f);
-                Modelo("Ciudad/Suburban/tree-large", p, s.centro + new Vector3(2.8f, 0, 1.2f), 3.2f, 40f);
-                Modelo("Ciudad/Suburban/tree-small", p, s.centro + new Vector3(0.5f, 0, 3.4f), 2.4f, 0f);
+                ArbolEn(p, s.centro + new Vector3(-2.5f, 0.1f, 2f), 1, 3.6f);
+                ArbolEn(p, s.centro + new Vector3(2.8f, 0.1f, 1.2f), 2, 3.2f);
+                ArbolEn(p, s.centro + new Vector3(0.5f, 0.1f, 3.4f), 3, 2.4f);
                 Modelo("Ciudad/Suburban/path-stones-long", p, s.centro + new Vector3(0, 0.05f, -1.5f), 2.2f, 90f);
                 Modelo("Ciudad/Suburban/planter", p, s.centro + new Vector3(-3f, 0, -3f), 1.5f, 0f);
                 break;
@@ -373,7 +364,7 @@ public class Ciudad3D : MonoBehaviour
         go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
         var rt = (RectTransform)go.transform;
         rt.sizeDelta = new Vector2(300, 320);
-        rt.localScale = Vector3.one * 0.0085f;
+        rt.localScale = Vector3.one * 0.013f;
 
         Image borde = UIFabrica.Caja(go.transform, "Borde", Paleta.Blanco);
         borde.sprite = UIFabrica.Circulo; borde.type = Image.Type.Simple;
@@ -385,6 +376,17 @@ public class Ciudad3D : MonoBehaviour
         UIFabrica.Anclar(s.fondoMedallon.rectTransform, 0.09f, 0.09f, 0.91f, 0.91f);
         s.letraMedallon = UIFabrica.Texto(s.fondoMedallon.transform, "?", 110, Paleta.Blanco, TextAnchor.MiddleCenter, FontStyle.Bold);
         UIFabrica.Anclar(s.letraMedallon.rectTransform, 0, 0, 1, 1);
+        RectTransform zi = UIFabrica.Crear("Icono", s.fondoMedallon.transform);
+        UIFabrica.Anclar(zi, 0.2f, 0.2f, 0.8f, 0.8f);
+        s.iconoMedallon = FormasUI.En(zi.gameObject);
+        s.iconoMedallon.raycastTarget = false;
+        // Punta del pin
+        Image punta = UIFabrica.Caja(go.transform, "Punta", Paleta.Blanco);
+        punta.rectTransform.anchorMin = punta.rectTransform.anchorMax = new Vector2(0.5f, 0.62f);
+        punta.rectTransform.sizeDelta = new Vector2(64, 64);
+        punta.rectTransform.anchoredPosition = new Vector2(0, -100);
+        punta.rectTransform.localRotation = Quaternion.Euler(0, 0, 45);
+        punta.transform.SetAsFirstSibling();
 
         Image pastilla = UIFabrica.Caja(go.transform, "Pastilla", Paleta.Tarjeta);
         pastilla.rectTransform.anchorMin = pastilla.rectTransform.anchorMax = new Vector2(0.5f, 0.08f);
@@ -403,9 +405,10 @@ public class Ciudad3D : MonoBehaviour
     {
         avatar3D = Avatar3D.Crear(transform);
         avatar = avatar3D.transform;
+        avatar.localScale = Vector3.one * EscalaAvatar;
         anilloAvatar = Pieza(PrimitiveType.Cylinder, "Anillo", new Vector3(0, 0.02f, 0), new Vector3(2.6f, 0.008f, 2.6f), Paleta.Hex("FFFDF8"), avatar).transform;
         Pieza(PrimitiveType.Cylinder, "Centro anillo", new Vector3(0, 0.03f, 0), new Vector3(2.2f, 0.008f, 2.2f), Paleta.Hex("F7D9A8"), avatar);
-        avatar.rotation = Quaternion.Euler(0, 180, 0);
+        avatar.rotation = Quaternion.Euler(0, 180f + GiroCamara * 0.7f, 0);
         CrearBurbujaEstado();
     }
 
@@ -427,6 +430,37 @@ public class Ciudad3D : MonoBehaviour
         textoEstado = UIFabrica.Texto(fondo.transform, "", 110, Paleta.TextoSuave, TextAnchor.MiddleCenter, FontStyle.Bold);
         UIFabrica.Anclar(textoEstado.rectTransform, 0, 0, 1, 1);
         carteles.Add(burbuja);
+
+        // Rótulo "Camino al gimnasio" mientras camina (como en la imagen de referencia)
+        var gr = new GameObject("Rótulo camino", typeof(RectTransform), typeof(Canvas));
+        gr.transform.SetParent(transform, false);
+        gr.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+        rotuloCamino = (RectTransform)gr.transform;
+        rotuloCamino.sizeDelta = new Vector2(520, 110);
+        rotuloCamino.localScale = Vector3.one * 0.0095f;
+        Image fr = UIFabrica.Caja(gr.transform, "Fondo", Paleta.Blanco);
+        UIFabrica.Anclar(fr.rectTransform, 0, 0, 1, 1);
+        UIFabrica.Sombra(fr, 6f, 0.2f);
+        textoCamino = UIFabrica.Texto(fr.transform, "", 52, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(textoCamino.rectTransform, 0.04f, 0, 0.96f, 1);
+        carteles.Add(rotuloCamino);
+        gr.SetActive(false);
+    }
+
+    private static string CaminoA(string rolId)
+    {
+        switch (rolId)
+        {
+            case "casa": return "Camino a casa";
+            case "cafeteria": return "Camino a la cafetería";
+            case "biblioteca": return "Camino a la biblioteca";
+            case "amigos": return "Camino a casa de tus amigos";
+            case "recreativos": return "Camino a los recreativos";
+            case "gimnasio": return "Camino al gimnasio";
+            case "trabajo": return "Camino al trabajo";
+            case "parque": return "Camino al parque";
+            default: return "De camino...";
+        }
     }
 
     public void PonerRopa(string colorHex) { if (avatar3D != null) avatar3D.PonerRopa(colorHex); }
@@ -453,6 +487,8 @@ public class Ciudad3D : MonoBehaviour
     private IEnumerator Caminar(int indice, Action alLlegar)
     {
         Caminando = true; avatar3D.Caminando = true;
+        textoCamino.text = CaminoA(datos.roles[indice]);
+        rotuloCamino.gameObject.SetActive(true);
         Vector3 inicio = avatar.position;
         Vector3 destino = solares[indice].Puerta;
         float calleInicio = MasCercana(inicio.z);
@@ -471,17 +507,18 @@ public class Ciudad3D : MonoBehaviour
             while ((avatar.position - p).sqrMagnitude > 0.01f)
             {
                 Vector3 dir = p - avatar.position;
-                avatar.position = Vector3.MoveTowards(avatar.position, p, 7.5f * Time.deltaTime);
+                avatar.position = Vector3.MoveTowards(avatar.position, p, 10.5f * Time.deltaTime);
                 if (dir.sqrMagnitude > 0.001f)
                     avatar.rotation = Quaternion.Slerp(avatar.rotation, Quaternion.LookRotation(new Vector3(dir.x, 0, dir.z)), 12f * Time.deltaTime);
                 yield return null;
             }
         }
         float t = 0f;
-        Quaternion desde = avatar.rotation, hacia = Quaternion.Euler(0, 180, 0);
+        Quaternion desde = avatar.rotation, hacia = Quaternion.Euler(0, 180f + GiroCamara * 0.7f, 0);
         while (t < 1f) { t += Time.deltaTime * 4f; avatar.rotation = Quaternion.Slerp(desde, hacia, t); yield return null; }
         datos.edificioActual = indice;
         Caminando = false; avatar3D.Caminando = false;
+        rotuloCamino.gameObject.SetActive(false);
         if (alLlegar != null) alLlegar();
     }
 
@@ -497,8 +534,9 @@ public class Ciudad3D : MonoBehaviour
     private void SituarCamara(bool instantaneo)
     {
         if (camara == null || avatar == null) return;
-        Vector3 objetivo = avatar.position + desplazamiento + Vector3.up * 1.6f + Vector3.forward * 4.5f;
-        Vector3 deseada = objetivo + new Vector3(0, 27f, -21f) * zoom;
+        Quaternion giro = Quaternion.Euler(0, GiroCamara, 0);
+        Vector3 objetivo = avatar.position + desplazamiento + Vector3.up * 2f + giro * Vector3.forward * 12f;
+        Vector3 deseada = objetivo + giro * new Vector3(0, 50f, -54f) * zoom;
         float k = instantaneo ? 1f : 1f - Mathf.Exp(-6f * Time.deltaTime);
         camara.transform.position = Vector3.Lerp(camara.transform.position, deseada, k);
         camara.transform.rotation = Quaternion.Slerp(camara.transform.rotation, Quaternion.LookRotation(objetivo - deseada), k);
@@ -527,10 +565,10 @@ public class Ciudad3D : MonoBehaviour
             if ((pos - inicioPuntero).sqrMagnitude > 400f) arrastrando = true;
             if (arrastrando)
             {
-                float f = 0.045f * zoom;
-                desplazamiento += new Vector3(-delta.x * f, 0, -delta.y * f);
-                desplazamiento.x = Mathf.Clamp(desplazamiento.x, -24f, 24f);
-                desplazamiento.z = Mathf.Clamp(desplazamiento.z, -24f, 24f);
+                float f = 0.07f * zoom;
+                desplazamiento += Quaternion.Euler(0, GiroCamara, 0) * new Vector3(-delta.x * f, 0, -delta.y * f);
+                desplazamiento.x = Mathf.Clamp(desplazamiento.x, -30f, 30f);
+                desplazamiento.z = Mathf.Clamp(desplazamiento.z, -30f, 34f);
             }
         }
         if (pulsado && puntero.press.wasReleasedThisFrame)
@@ -562,7 +600,7 @@ public class Ciudad3D : MonoBehaviour
         for (int i = 0; i < solares.Count; i++)
         {
             Solar s = solares[i];
-            s.medallon.transform.localPosition = s.centro + new Vector3(0, s.alto + 2.4f + Mathf.Sin(tiempo * 2f + i) * 0.18f, 0);
+            s.medallon.transform.localPosition = s.centro + new Vector3(0, s.alto + 3f + Mathf.Sin(tiempo * 2f + i) * 0.18f, 0);
         }
     }
 
@@ -581,7 +619,7 @@ public class Ciudad3D : MonoBehaviour
         burbuja.gameObject.SetActive(mostrar);
         if (mostrar)
         {
-            burbuja.position = avatar.position + new Vector3(1.1f, 4.6f + Mathf.Sin(tiempo * 2.4f) * 0.12f, 0);
+            burbuja.position = avatar.position + new Vector3(1.1f, 4.6f + Mathf.Sin(tiempo * 2.4f) * 0.12f, 0) * EscalaAvatar;
             if (e != estadoDibujado)
             {
                 estadoDibujado = e;
@@ -593,13 +631,16 @@ public class Ciudad3D : MonoBehaviour
             }
         }
 
+        if (rotuloCamino.gameObject.activeSelf)
+            rotuloCamino.position = avatar.position + new Vector3(0, 5.2f + Mathf.Sin(tiempo * 2.4f) * 0.1f, 0) * EscalaAvatar;
+
         // Huellas al caminar, que se encogen y desaparecen
         if (Caminando && tiempo >= proximaHuella)
         {
             proximaHuella = tiempo + 0.16f;
             huellaIzquierda = !huellaIzquierda;
-            Vector3 lado = avatar.right * (huellaIzquierda ? -0.28f : 0.28f);
-            GameObject h = Pieza(PrimitiveType.Cylinder, "Huella", avatar.position + lado + new Vector3(0, 0.07f, 0), new Vector3(0.32f, 0.01f, 0.46f), Paleta.Hex("D8C3A5"));
+            Vector3 lado = avatar.right * (huellaIzquierda ? -0.45f : 0.45f);
+            GameObject h = Pieza(PrimitiveType.Cylinder, "Huella", avatar.position + lado + new Vector3(0, 0.1f, 0), new Vector3(0.5f, 0.01f, 0.72f), Paleta.Hex("FFFFFF"));
             h.transform.rotation = avatar.rotation;
             huellas.Add(new KeyValuePair<Transform, float>(h.transform, tiempo));
         }
@@ -609,7 +650,7 @@ public class Ciudad3D : MonoBehaviour
             Transform t = huellas[i].Key;
             if (edad > 2.2f) { Destroy(t.gameObject); huellas.RemoveAt(i); continue; }
             float f = 1f - Mathf.Clamp01((edad - 1.2f) / 1f);
-            t.localScale = new Vector3(0.32f * f, 0.01f, 0.46f * f);
+            t.localScale = new Vector3(0.5f * f, 0.01f, 0.72f * f);
         }
     }
 
@@ -633,7 +674,7 @@ public class Ciudad3D : MonoBehaviour
     public static int Manzanas(int indice)
     {
         Vector3 d = Solares[indice] - Solares[IndiceCasa];
-        return Mathf.Max(0, Mathf.RoundToInt((Mathf.Abs(d.x) + Mathf.Abs(d.z)) / 14f));
+        return Mathf.Max(0, Mathf.RoundToInt((Mathf.Abs(d.x) + Mathf.Abs(d.z)) / Paso));
     }
 
     /// <summary>Muestra los anillos de distancia desde casa y marca el solar elegido.</summary>
@@ -646,7 +687,7 @@ public class Ciudad3D : MonoBehaviour
         Color[] colores = { Paleta.Hex("FFFFFF"), Paleta.Hex("FFF1D6") };
         for (int r = 1; r <= 2; r++)
         {
-            float radio = 14f * r;
+            float radio = Paso * r;
             int n = 28 * r;
             for (int i = 0; i < n; i++)
             {
@@ -674,7 +715,7 @@ public class Ciudad3D : MonoBehaviour
 
     // ---------------------------------------------------------------- barrios bloqueados
 
-    private static readonly Vector3[] CentrosBarrio = { new Vector3(46f, 0, 0), new Vector3(-46f, 0, 0), new Vector3(0, 0, 46f) };
+    private static readonly Vector3[] CentrosBarrio = { new Vector3(58f, 0, 0), new Vector3(-58f, 0, 0), new Vector3(0, 0, 58f) };
     public static readonly int[] NivelBarrio = { 3, 5, 8 };
     private readonly List<Text> textosBarrio = new List<Text>();
 

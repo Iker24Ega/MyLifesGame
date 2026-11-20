@@ -58,6 +58,52 @@ public static class Iconos
         }
     }
 
+    /// <summary>Icono de cada papel de edificio (casa, gimnasio, cafetería...) para los pines de la ciudad, en el color "c".</summary>
+    public static void IconoRol(FormasUI f, string rol, Color c)
+    {
+        f.Limpiar();
+        switch (rol)
+        {
+            case "casa":
+                f.Poligono(new[] { new Vector2(-0.62f, 0.02f), new Vector2(0f, 0.6f), new Vector2(0.62f, 0.02f) }, c);
+                f.Rect(new Vector2(0, -0.28f), new Vector2(0.84f, 0.62f), 0f, c);
+                f.Rect(new Vector2(0, -0.38f), new Vector2(0.22f, 0.42f), 0f, new Color(0, 0, 0, 0.18f));
+                break;
+            case "gimnasio": DibujarTrazo(f, Area.Fisico, c, false); break;
+            case "cafeteria":
+                f.Rect(new Vector2(-0.08f, -0.08f), new Vector2(0.78f, 0.7f), 0f, c);
+                f.Arco(new Vector2(0.36f, -0.04f), 0.14f, 0.28f, 0f, 180f, c);
+                f.Rect(new Vector2(-0.08f, -0.5f), new Vector2(1.0f, 0.1f), 0f, c);
+                f.Rect(new Vector2(-0.26f, 0.48f), new Vector2(0.08f, 0.26f), 12f, c);
+                f.Rect(new Vector2(0.06f, 0.5f), new Vector2(0.08f, 0.3f), -10f, c);
+                break;
+            case "biblioteca": case "trabajo":
+                if (rol == "biblioteca") DibujarTrazo(f, Area.Mente, c, false);
+                else
+                {
+                    f.Rect(new Vector2(0, -0.12f), new Vector2(1.1f, 0.74f), 0f, c);
+                    f.Arco(new Vector2(0, 0.26f), 0.16f, 0.28f, -90f, 90f, c);
+                    f.Rect(new Vector2(0, -0.06f), new Vector2(1.1f, 0.08f), 0f, new Color(0, 0, 0, 0.18f));
+                }
+                break;
+            case "parque":
+                f.Poligono(new[] { new Vector2(0f, 0.7f), new Vector2(0.5f, 0.1f), new Vector2(0.2f, -0.45f), new Vector2(-0.2f, -0.45f), new Vector2(-0.5f, 0.1f) }, c);
+                f.Rect(new Vector2(0, -0.45f), new Vector2(0.1f, 0.5f), 0f, c);
+                break;
+            case "amigos": DibujarTrazo(f, Area.Social, c, false); break;
+            case "recreativos":
+                f.Rect(new Vector2(0, -0.05f), new Vector2(1.2f, 0.56f), 0f, c);
+                f.Circulo(new Vector2(-0.55f, -0.12f), 0.3f, c);
+                f.Circulo(new Vector2(0.55f, -0.12f), 0.3f, c);
+                f.Rect(new Vector2(-0.4f, 0f), new Vector2(0.28f, 0.08f), 0f, new Color(0, 0, 0, 0.2f));
+                f.Rect(new Vector2(-0.4f, 0f), new Vector2(0.08f, 0.28f), 0f, new Color(0, 0, 0, 0.2f));
+                f.Circulo(new Vector2(0.36f, 0.06f), 0.07f, new Color(0, 0, 0, 0.2f));
+                f.Circulo(new Vector2(0.52f, -0.08f), 0.07f, new Color(0, 0, 0, 0.2f));
+                break;
+            default: DibujarTrazo(f, Area.Animo, c, false); break;
+        }
+    }
+
     /// <summary>Área principal de cada acción, para su icono.</summary>
     public static Area AreaDeAccion(string id)
     {

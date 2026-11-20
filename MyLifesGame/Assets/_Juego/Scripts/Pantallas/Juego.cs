@@ -184,20 +184,31 @@ public class Juego : MonoBehaviour
 
     private void CrearAviso(Transform canvas)
     {
-        Image fondo = UIFabrica.Caja(canvas, "Aviso", new Color(0.29f, 0.2f, 0.15f, 0.92f));
+        // Tarjeta blanca pequeña arriba, bajo la cabecera, con una medalla: no tapa al avatar ni los menús.
+        Image fondo = UIFabrica.Caja(canvas, "Aviso", Paleta.Tarjeta);
         fondo.raycastTarget = false;
+        UIFabrica.Sombra(fondo, 10f, 0.22f);
         RectTransform rt = fondo.rectTransform;
-        rt.anchorMin = new Vector2(0.05f, 0);
-        rt.anchorMax = new Vector2(0.95f, 0);
-        rt.pivot = new Vector2(0.5f, 0);
-        rt.sizeDelta = new Vector2(0, 150);
-        rt.anchoredPosition = new Vector2(0, Pantalla.AltoBarra + 40);
-        aviso = UIFabrica.Texto(fondo.transform, "", 34, Paleta.Blanco, TextAnchor.MiddleCenter, FontStyle.Bold);
-        UIFabrica.Anclar(aviso.rectTransform, 0.03f, 0, 0.97f, 1);
+        rt.anchorMin = new Vector2(0.1f, 1);
+        rt.anchorMax = new Vector2(0.9f, 1);
+        rt.pivot = new Vector2(0.5f, 1);
+        rt.sizeDelta = new Vector2(0, 112);
+        rt.anchoredPosition = new Vector2(0, -330);
+        Image franja = UIFabrica.Caja(fondo.transform, "Franja", Paleta.Hex("F2B632"));
+        UIFabrica.Anclar(franja.rectTransform, 0, 0, 0.018f, 1);
+        RectTransform zm = UIFabrica.Crear("Medalla", fondo.transform);
+        zm.anchorMin = zm.anchorMax = new Vector2(0, 0.5f);
+        zm.sizeDelta = new Vector2(78, 78);
+        zm.anchoredPosition = new Vector2(70, 0);
+        Iconos.Medalla(FormasUI.En(zm.gameObject), MyLifesGame.Motor.Area.Animo, true);
+        aviso = UIFabrica.Texto(fondo.transform, "", 34, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
+        UIFabrica.Anclar(aviso.rectTransform, 0.17f, 0, 0.96f, 1);
         fondo.gameObject.SetActive(false);
     }
 
     /// <summary>Muestra un aviso arriba unos segundos (logros, misiones...).</summary>
+    private float inicioAviso;
+
     public void Avisar(string texto)
     {
         if (string.IsNullOrEmpty(texto)) return;
@@ -205,6 +216,9 @@ public class Juego : MonoBehaviour
         Sonidos.Aviso();
         aviso.transform.parent.gameObject.SetActive(true);
         aviso.transform.parent.SetAsLastSibling();
+        int lineas = texto.Split('\n').Length;
+        ((RectTransform)aviso.transform.parent).sizeDelta = new Vector2(0, 70 + 44 * lineas);
+        inicioAviso = Time.unscaledTime;
         finAviso = Time.unscaledTime + 3.5f;
     }
 
@@ -224,12 +238,11 @@ public class Juego : MonoBehaviour
         if (aviso != null && aviso.transform.parent.gameObject.activeSelf)
         {
             if (Time.unscaledTime > finAviso) aviso.transform.parent.gameObject.SetActive(false);
-            // Con la hoja de la ciudad abierta, el aviso sube por encima de ella para no taparla
+            // Entra bajando y rebotando un poco
             var rtAviso = (RectTransform)aviso.transform.parent;
-            bool hojaAbierta = actual == pCiudad && pCiudad.HojaAbierta;
-            float alto = hojaAbierta ? pCiudad.AltoHoja + Pantalla.AltoBarra + 30 : Pantalla.AltoBarra + 40;
-            if (actual == pCiudad && pCiudad.GuiaVisible) alto = Pantalla.AltoBarra + 380;
-            rtAviso.anchoredPosition = new Vector2(0, alto);
+            float t = Mathf.Clamp01((Time.unscaledTime - inicioAviso) / 0.35f);
+            float rebote = 1f - Mathf.Pow(1f - t, 3f);
+            rtAviso.anchoredPosition = new Vector2(0, -330 + (1f - rebote) * 120f);
         }
 
         if (Time.unscaledTime > proximoGuardado)

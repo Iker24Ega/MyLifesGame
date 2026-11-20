@@ -25,7 +25,7 @@ public class PantallaHacer : Pantalla
         tarjetas = new Image[n];
         for (int f = 0; f < (n + 1) / 2; f++)
         {
-            RectTransform fila = UIFabrica.Fila(columna, "Fila " + f, 170);
+            RectTransform fila = UIFabrica.Fila(columna, "Fila " + f, 200);
             for (int c = 0; c < 2; c++)
             {
                 int i = f * 2 + c;
@@ -34,21 +34,25 @@ public class PantallaHacer : Pantalla
                 Button b = UIFabrica.Boton(fila, "", Paleta.Tarjeta, Paleta.Texto, 10, () => Elegir(a));
                 UIFabrica.Anclar((RectTransform)b.transform, c * 0.5f + 0.01f, 0, (c + 1) * 0.5f - 0.01f, 1);
                 tarjetas[i] = (Image)b.targetGraphic;
-                FormasUI icono = Iconos.Crear(b.transform, Iconos.AreaDeAccion(a.id), 78f);
-                icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0.2f, 0.56f);
-                Text nombre = UIFabrica.Texto(b.transform, a.nombre, 34, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
-                UIFabrica.Anclar(nombre.rectTransform, 0.38f, 0.45f, 0.98f, 0.9f);
-                Text zona = UIFabrica.Texto(b.transform, Rango(a), 22, Paleta.TextoSuave, TextAnchor.MiddleLeft);
-                UIFabrica.Anclar(zona.rectTransform, 0.38f, 0.22f, 0.98f, 0.48f);
+                // Como la imagen de referencia: icono grande arriba, nombre debajo y puntos de las áreas que mejora
+                RectTransform zi = UIFabrica.Crear("Icono", b.transform);
+                zi.anchorMin = zi.anchorMax = new Vector2(0.5f, 0.64f);
+                zi.sizeDelta = new Vector2(104, 104);
+                FormasUI icono = FormasUI.En(zi.gameObject);
+                icono.raycastTarget = false;
+                Iconos.IconoAccion(icono, a.id);
+                UIFabrica.Sombra(icono, 4f, 0.12f);
+                Text nombre = UIFabrica.Texto(b.transform, a.nombre, 30, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+                UIFabrica.Anclar(nombre.rectTransform, 0.03f, 0.14f, 0.97f, 0.36f);
                 int k = 0;
                 foreach (Area area in Areas.Todas)
                 {
                     if (a.efectoHora.Get(area) <= 0 && !(area == Area.Social && a.socialConAmigosPorHora > 0)) continue;
                     Image punto = UIFabrica.Caja(b.transform, "Punto", Paleta.DeArea(area));
                     punto.sprite = UIFabrica.Circulo; punto.type = Image.Type.Simple;
-                    punto.rectTransform.anchorMin = punto.rectTransform.anchorMax = new Vector2(0.38f, 0.13f);
-                    punto.rectTransform.sizeDelta = new Vector2(18, 18);
-                    punto.rectTransform.anchoredPosition = new Vector2(9 + k * 24, 0);
+                    punto.rectTransform.anchorMin = punto.rectTransform.anchorMax = new Vector2(0.5f, 0.08f);
+                    punto.rectTransform.sizeDelta = new Vector2(16, 16);
+                    punto.rectTransform.anchoredPosition = new Vector2(-30 + k * 22, 0);
                     k++;
                 }
             }

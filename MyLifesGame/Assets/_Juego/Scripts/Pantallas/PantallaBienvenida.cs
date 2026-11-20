@@ -75,6 +75,8 @@ public class PantallaBienvenida : Pantalla
     {
         RectTransform f = UIFabrica.Fila(contenido, "Avatar", alto);
         avatar = new AvatarDibujo(f);
+        avatar.UsarSala();
+        UsaEscena = true;
         avatar.Actualizar(TipoEstadoAvatar.EnForma, Catalogos.BuscarPrenda(prenda).colorHex);
     }
 

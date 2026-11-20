@@ -62,6 +62,45 @@ public static class Iconos
     public static void IconoRol(FormasUI f, string rol, Color c)
     {
         f.Limpiar();
+        GlifoRol(f, rol, c);
+    }
+
+    /// <summary>Icono propio de cada acción (pesa, huellas, libro, maletín, burbujas, mando, luna, loto) sobre un círculo del color de su área.</summary>
+    public static void IconoAccion(FormasUI f, string accion)
+    {
+        f.Limpiar();
+        Color fondo = Paleta.DeArea(AreaDeAccion(accion));
+        f.Circulo(Vector2.zero, 1f, fondo);
+        f.Circulo(new Vector2(-0.18f, 0.22f), 0.62f, new Color(1, 1, 1, 0.12f));
+        Color b = Color.white;
+        f.Escala = 0.62f;
+        switch (accion)
+        {
+            case "entrenar": GlifoRol(f, "gimnasio", b); break;
+            case "estudiar": GlifoRol(f, "biblioteca", b); break;
+            case "trabajar": GlifoRol(f, "trabajo", b); break;
+            case "quedar": GlifoRol(f, "amigos", b); break;
+            case "videojuegos": GlifoRol(f, "recreativos", b); break;
+            case "pasear":
+                f.Circulo(new Vector2(-0.32f, 0.3f), 0.26f, b); f.Circulo(new Vector2(-0.32f, -0.12f), 0.16f, b);
+                f.Circulo(new Vector2(0.32f, -0.05f), 0.26f, b); f.Circulo(new Vector2(0.32f, -0.47f), 0.16f, b);
+                break;
+            case "descansar":
+                f.Circulo(Vector2.zero, 0.7f, b);
+                f.Circulo(new Vector2(0.32f, 0.22f), 0.6f, fondo);
+                break;
+            default: // meditar: loto
+                f.Poligono(new[] { new Vector2(0, 0.7f), new Vector2(0.28f, 0.05f), new Vector2(0, -0.35f), new Vector2(-0.28f, 0.05f) }, b);
+                f.Poligono(new[] { new Vector2(-0.75f, 0.25f), new Vector2(-0.12f, -0.1f), new Vector2(-0.05f, -0.4f), new Vector2(-0.55f, -0.2f) }, b);
+                f.Poligono(new[] { new Vector2(0.75f, 0.25f), new Vector2(0.55f, -0.2f), new Vector2(0.05f, -0.4f), new Vector2(0.12f, -0.1f) }, b);
+                f.Rect(new Vector2(0, -0.5f), new Vector2(1.2f, 0.12f), 0f, b);
+                break;
+        }
+        f.Escala = 1f;
+    }
+
+    private static void GlifoRol(FormasUI f, string rol, Color c)
+    {
         switch (rol)
         {
             case "casa":

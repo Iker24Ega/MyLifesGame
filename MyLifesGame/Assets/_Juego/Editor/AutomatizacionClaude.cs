@@ -84,6 +84,7 @@ public static class AutomatizacionClaude
         EscribirEstado("compilando web");
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
         PlayerSettings.WebGL.decompressionFallback = true;
+        PlayerSettings.WebGL.nameFilesAsHashes = true; // nombres nuevos en cada versión: el móvil no se queda con la caché vieja
         PlayerSettings.stripEngineCode = true; // link.xml conserva los colisionadores; sin recorte la versión web desborda la pila
         PlayerSettings.productName = "My Life's Game";
         var opciones = new BuildPlayerOptions

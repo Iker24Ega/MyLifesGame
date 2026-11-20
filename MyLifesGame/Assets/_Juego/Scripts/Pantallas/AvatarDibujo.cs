@@ -49,9 +49,30 @@ public class AvatarDibujo
         UIFabrica.Anclar(extra.rectTransform, 0.6f, 0.62f, 0.94f, 0.95f);
     }
 
+    private RawImage sala;
+
+    /// <summary>Muestra al avatar dentro del vestidor 3D (sala de escena) en lugar de la habitación dibujada.</summary>
+    public void UsarSala()
+    {
+        sala = new GameObject("Sala 3D", typeof(RectTransform)).AddComponent<RawImage>();
+        sala.transform.SetParent(fondo.transform, false);
+        sala.texture = EstudioAvatar.TexturaEscena;
+        sala.raycastTarget = false;
+        UIFabrica.Anclar(sala.rectTransform, 0, 0, 1, 1);
+        sala.transform.SetSiblingIndex(fondo.transform.childCount - 2); // debajo del texto "¡Genial!"
+    }
+
     public void Actualizar(TipoEstadoAvatar estado, string colorSudadera)
     {
         EstudioAvatar.Actualizar(estado, colorSudadera);
+        if (sala != null)
+        {
+            EstudioAvatar.PonerEscena("avatar", 1.6f, 0.74f);
+            Rect r = fondo.rectTransform.rect;
+            float aspecto = r.height > 1f ? r.width / r.height : 1.4f;
+            float tex = (float)EstudioAvatar.TexturaEscena.width / EstudioAvatar.TexturaEscena.height;
+            sala.uvRect = aspecto > tex ? new Rect(0, (1f - tex / aspecto) * 0.5f, 1, tex / aspecto) : new Rect((1f - aspecto / tex) * 0.5f, 0, aspecto / tex, 1);
+        }
         Color cielo;
         switch (estado)
         {

@@ -11,8 +11,9 @@ public class PantallaAlbum : Pantalla
     private readonly Text[] textos;
     private readonly Image[] tarjetas;
 
-    public PantallaAlbum(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla álbum", 4)
+    public PantallaAlbum(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla álbum", 4, true)
     {
+        ComoHoja(0.93f, 0.12f);
         RectTransform cab = UIFabrica.Fila(columna, "Cabecera", 110);
         cabecera = UIFabrica.Texto(cab, "", 60, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
         UIFabrica.Anclar(cabecera.rectTransform, 0, 0.3f, 0.7f, 1);

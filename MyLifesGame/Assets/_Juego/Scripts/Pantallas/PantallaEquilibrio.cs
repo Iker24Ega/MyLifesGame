@@ -16,8 +16,9 @@ public class PantallaEquilibrio : Pantalla
     private readonly Text[] valores = new Text[5];
     private readonly Text sugerencia;
 
-    public PantallaEquilibrio(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla equilibrio", 1)
+    public PantallaEquilibrio(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla equilibrio", 1, true)
     {
+        ComoHoja(0.93f, 0.12f);
         RectTransform cabecera = UIFabrica.Fila(columna, "Cabecera", 90);
         Button volver = UIFabrica.Boton(cabecera, "<", Paleta.Tarjeta, Paleta.Texto, 44, () => this.juego.IrAPestana(1));
         UIFabrica.Anclar((RectTransform)volver.transform, 0, 0.05f, 0.11f, 0.95f);

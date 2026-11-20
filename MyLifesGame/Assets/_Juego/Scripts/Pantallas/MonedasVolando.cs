@@ -4,7 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(FormasUI))]
 public class MonedasVolando : MonoBehaviour
 {
-    private const int N = 14;
+    private const int N = 9;
     private readonly Vector2[] inicio = new Vector2[N], control = new Vector2[N];
     private readonly float[] retraso = new float[N];
     private Vector2 destino;
@@ -40,16 +40,16 @@ public class MonedasVolando : MonoBehaviour
         if (formas == null || t > 50f) return;
         t += Mathf.Min(Time.unscaledDeltaTime, 0.05f);
         formas.Limpiar();
-        if (t > 2f) { t = 99f; return; }
+        if (t > 1.4f) { t = 99f; return; }
         Color oro = Paleta.Hex("E3B341"), brillo = Paleta.Hex("F6D26B");
         for (int i = 0; i < N; i++)
         {
-            float k = Mathf.Clamp01((t - retraso[i]) / 1.1f);
+            float k = Mathf.Clamp01((t - retraso[i]) / 0.75f);
             if (k <= 0f || k >= 1f) continue;
             float e = k * k * (3f - 2f * k);
             Vector2 a = Vector2.Lerp(inicio[i], control[i], e), b = Vector2.Lerp(control[i], destino, e);
             Vector2 p = Vector2.Lerp(a, b, e);
-            float r = Mathf.Lerp(0.07f, 0.04f, e);
+            float r = Mathf.Lerp(0.045f, 0.028f, e);
             float giro = Mathf.Abs(Mathf.Cos((t + i) * 9f));
             formas.Rect(p, new Vector2(r * 2f * Mathf.Max(0.25f, giro), r * 2f), 0f, oro);
             formas.Rect(p, new Vector2(r * 1.2f * Mathf.Max(0.2f, giro), r * 1.2f), 0f, brillo);

@@ -118,18 +118,70 @@ public static class EstudioAvatar
         camEscena.transform.position = Lugar + new Vector3(8.5f, 8.2f, 15.5f) * distancia;
         camEscena.transform.LookAt(Lugar + new Vector3(-0.8f, mirada, 0.2f));
         string sala = Salas3D.SalaDe(accion);
-        if (sala != salaActual || accion != accionSala)
+        bool conImagen = Resources.Load<Texture2D>("Sprites/sala_" + sala) != null;
+        if (sala != salaActual || accion != accionSala || conImagen) // con imagen se recoloca siempre (depende del encuadre)
         {
             for (int i = salas.childCount - 1; i >= 0; i--)
                 if (salas.GetChild(i).GetComponent<Light>() == null) Object.Destroy(salas.GetChild(i).gameObject);
             var cont = new GameObject("Sala " + sala).transform;
             cont.SetParent(salas, false);
-            Salas3D.Construir(cont, sala, accion);
+            Texture2D fondo = Resources.Load<Texture2D>("Sprites/sala_" + sala);
+            if (fondo != null) FondoSala(cont, fondo);   // la sala tal cual la imagen de Flow
+            else Salas3D.Construir(cont, sala, accion);
             foreach (Transform t in cont.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = CapaEscena;
             salaActual = sala; accionSala = accion;
         }
         camEscena.enabled = true;
         avatar.transform.localRotation = Quaternion.Euler(0, 30, 0);
+    }
+
+    /// <summary>
+    /// Fondo de la sala con la imagen de Flow: un cuadro de cara a la cámara, un poco detrás del avatar,
+    /// colocado para que los pies del avatar caigan en el centro del suelo de la habitación.
+    /// </summary>
+    private static readonly System.Collections.Generic.Dictionary<Texture, Material> matsFondo = new System.Collections.Generic.Dictionary<Texture, Material>();
+    private static Material matSombra;
+
+    private static void FondoSala(Transform cont, Texture2D tex)
+    {
+        Transform cam = camEscena.transform;
+        Vector3 pies = Lugar;
+        Vector3 f = cam.forward;
+        // Encuadre como en la imagen de Flow: el avatar en el centro, ocupando un tercio del alto de la pantalla
+        cam.position = (Lugar + Vector3.up * (Avatar3D.Altura * 0.5f)) - f * 25f;
+        Vector3 p0 = pies + f * 3f;
+        Vector3 d = (pies - cam.position).normalized;
+        float t = Vector3.Dot(p0 - cam.position, f) / Vector3.Dot(d, f);
+        Vector3 q = cam.position + d * t;
+        float distPlano = Vector3.Dot(q - cam.position, f);
+        float altoSala = 2f * distPlano * Mathf.Tan(camEscena.fieldOfView * 0.5f * Mathf.Deg2Rad) * 1.08f; // llena la pantalla
+        const float sueloV = 0.30f;            // altura (desde abajo) del centro del suelo en la imagen
+        float ancho = altoSala * tex.width / (float)tex.height;
+        var go = new GameObject("Fondo sala", typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(cont, false);
+        go.transform.position = q;
+        go.transform.rotation = cam.rotation;
+        var m = new Mesh { name = "Fondo sala" };
+        float y0 = -sueloV * altoSala, y1 = (1f - sueloV) * altoSala;
+        m.vertices = new[] { new Vector3(-ancho / 2, y0, 0), new Vector3(ancho / 2, y0, 0), new Vector3(-ancho / 2, y1, 0), new Vector3(ancho / 2, y1, 0) };
+        m.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1), new Vector2(1, 1) };
+        m.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+        m.RecalculateBounds();
+        go.GetComponent<MeshFilter>().sharedMesh = m;
+        var r = go.GetComponent<MeshRenderer>();
+        Material mf;
+        if (!matsFondo.TryGetValue(tex, out mf)) { mf = new Material(Shader.Find("Sprites/Default")) { mainTexture = tex }; matsFondo[tex] = mf; }
+        r.sharedMaterial = mf;
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        // Sombra suave bajo el avatar para que "pise" el suelo de la imagen
+        var sombra = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.Destroy(sombra.GetComponent<Collider>());
+        sombra.name = "Sombra";
+        sombra.transform.SetParent(cont, false);
+        sombra.transform.position = pies + Vector3.up * 0.02f;
+        sombra.transform.localScale = new Vector3(1.9f, 0.005f, 1.9f);
+        if (matSombra == null) matSombra = new Material(Shader.Find("Sprites/Default")) { color = new Color(0.35f, 0.22f, 0.12f, 0.28f) };
+        sombra.GetComponent<Renderer>().sharedMaterial = matSombra;
     }
 
     public static void QuitarEscena()

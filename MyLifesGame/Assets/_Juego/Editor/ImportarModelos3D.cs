@@ -146,6 +146,19 @@ public class ImportarModelos3D : AssetPostprocessor
 
     private void OnPreprocessTexture()
     {
+        if (assetPath.Replace('\\', '/').Contains("/Resources/Sprites/"))
+        {
+            // Imágenes de Flow recortadas que se colocan en la ciudad
+            var ts = (TextureImporter)assetImporter;
+            ts.textureType = TextureImporterType.Default;
+            ts.alphaIsTransparency = true;
+            ts.alphaSource = TextureImporterAlphaSource.FromInput;
+            ts.wrapMode = TextureWrapMode.Clamp;
+            ts.mipmapEnabled = true;
+            ts.maxTextureSize = 512;
+            ts.npotScale = TextureImporterNPOTScale.None;
+            return;
+        }
         if (!EsNuestro) return;
         var t = (TextureImporter)assetImporter;
         if (assetPath.ToLowerInvariant().Contains("textura"))

@@ -23,11 +23,11 @@ public partial class Ciudad3D : MonoBehaviour
         new Vector3(-Paso, 0, Paso), new Vector3(0, 0, Paso), new Vector3(Paso, 0, Paso),
     };
     /// <summary>Distancia entre centros de manzana (deja aceras anchas para árboles y farolas).</summary>
-    public const float Paso = 16f;
+    public const float Paso = 21f;
     /// <summary>Vista isométrica: la cámara mira la ciudad en diagonal, como en la imagen de referencia.</summary>
     private const float GiroCamara = 45f;
     /// <summary>En la ciudad el avatar se ve grande y legible (decisión de diseño 5.11).</summary>
-    public const float EscalaAvatar = 2.1f;
+    public const float EscalaAvatar = 1.35f;
     public const int IndiceCasa = 1;
 
     private static readonly float[] Calles = { -Paso * 1.5f, -Paso * 0.5f, Paso * 0.5f, Paso * 1.5f };
@@ -52,7 +52,7 @@ public partial class Ciudad3D : MonoBehaviour
     private float proximaHuella;
     private bool huellaIzquierda;
     private readonly List<KeyValuePair<Transform, float>> huellas = new List<KeyValuePair<Transform, float>>();
-    private float zoom = 1f;
+    private float zoom = 1.3f;
     private Vector3 desplazamiento;          // arrastre de la cámara
     private Vector2 inicioPuntero;
     private bool arrastrando, pulsado;
@@ -94,13 +94,13 @@ public partial class Ciudad3D : MonoBehaviour
 
         for (int i = 0; i < Solares.Length; i++)
         {
-            var s = new Solar { centro = Curva(Solares[i]), puertaLogica = Solares[i] + new Vector3(0, 0, -5.6f), giro = GiroSolar(i) };
+            var s = new Solar { centro = Curva(Solares[i]), puertaLogica = Solares[i] + (HaySprites ? HaciaCamara * (AnchoSolar * 0.78f + 1.2f) : new Vector3(0, 0, -5.6f)), giro = GiroSolar(i) };
             s.raiz = new GameObject("Solar " + i).transform;
             s.raiz.SetParent(transform, false);
             s.raiz.gameObject.AddComponent<Lote>().indice = i;
             var col = s.raiz.gameObject.AddComponent<BoxCollider>();
-            col.center = s.centro + new Vector3(0, 3f, 0);
-            col.size = new Vector3(10f, 6f, 10f);
+            col.center = s.centro + new Vector3(0, 6f, 0);
+            col.size = new Vector3(11f, 12f, 11f);
             CrearMedallon(s);
             solares.Add(s);
         }
@@ -110,6 +110,7 @@ public partial class Ciudad3D : MonoBehaviour
         BarriosBloqueados();
         CrearAvatar();
         avatar.position = solares[datos.edificioActual].Puerta;
+        avatar.rotation = Quaternion.LookRotation(HaciaCamara); // en reposo mira a la cámara
         ActualizarTodos();
         SituarCamara(true);
     }
@@ -282,8 +283,20 @@ public partial class Ciudad3D : MonoBehaviour
         }
     }
 
+    private static readonly string[] CasasRelleno =
+    {
+        "casa_relleno_1", "casa_relleno_2", "casa_relleno_3", "casa_relleno_4", "casa_relleno_5", "casa_relleno_6",
+        "casa_relleno_7", "casa_relleno_8", "relleno_casa_menta", "relleno_esquina_melocoton", "relleno_pisos_crema",
+    };
+
     private void Decorado(Vector3 pos, int k, string[] variantes, string ruta, float ancho, float giro)
     {
+        // Con imágenes de Flow: casas tranquilas de relleno (las que existan), separadas y variadas
+        for (int i = 0; i < CasasRelleno.Length; i++)
+        {
+            string n = CasasRelleno[(k * 5 + i) % CasasRelleno.Length];
+            if (Edificio2D(n, transform, Curva(pos), ancho * 1.35f) != null) return;
+        }
         Modelo(ruta + variantes[(k * 7) % variantes.Length], transform, Curva(pos), ancho, giro + ((k * 37) % 13 - 6));
     }
 
@@ -435,6 +448,8 @@ public partial class Ciudad3D : MonoBehaviour
     {
         string nombre;
         if (rol == null || !ModelosPorRol.TryGetValue(rol, out nombre)) nombre = Relleno[indice % Relleno.Length];
+        // 1.º la imagen de Flow tal cual (se ve igual que el diseño); 2.º el modelo 3D generado; 3.º Kenney
+        if (Edificio2D(nombre, p, centro, AnchoSolar * 1.55f) != null) return true;
         if (!Modelos3D.Existe(nombre)) return false;
         GameObject go = Modelos3D.Crear(nombre, p, AnchoSolar * 1.1f);
         go.transform.localPosition = centro;
@@ -615,7 +630,7 @@ public partial class Ciudad3D : MonoBehaviour
             }
         }
         float t = 0f;
-        Quaternion desde = avatar.rotation, hacia = Quaternion.Euler(0, 180f + GiroCamara * 0.7f, 0);
+        Quaternion desde = avatar.rotation, hacia = Quaternion.LookRotation(HaciaCamara + Quaternion.Euler(0, 90, 0) * HaciaCamara * 0.25f);
         while (t < 1f) { t += Time.deltaTime * 4f; avatar.rotation = Quaternion.Slerp(desde, hacia, t); yield return null; }
         datos.edificioActual = indice;
         Caminando = false; avatar3D.Caminando = false;
@@ -644,6 +659,60 @@ public partial class Ciudad3D : MonoBehaviour
         float[] g = { 7f, -5f, 9f, -8f, 4f, -6f, 6f, -9f };
         return g[i % g.Length];
     }
+
+    // ---------------------------------------------------------------- imágenes de Flow en el mundo
+
+    /// <summary>Dirección (en el suelo) desde la ciudad hacia la cámara.</summary>
+    private static readonly Vector3 HaciaCamara = Quaternion.Euler(0, GiroCamara, 0) * Vector3.back;
+    private Shader shaderSprite;
+    private readonly Dictionary<string, Material> matsSprite = new Dictionary<string, Material>();
+
+    /// <summary>
+    /// Coloca una imagen de Flow (Resources/Sprites, fondo recortado) de pie en el mundo, siempre de cara a la cámara.
+    /// La cámara de la ciudad tiene un ángulo fijo parecido al de las imágenes, así que se ven igual que el diseño.
+    /// <paramref name="base_"/> es el punto del suelo que coincide con la parte de abajo de la imagen.
+    /// </summary>
+    private GameObject Sprite2D(string nombre, Transform padre, Vector3 base_, float tam, bool tamEsAlto = false)
+    {
+        Texture2D tex = Resources.Load<Texture2D>("Sprites/" + nombre);
+        if (tex == null) return null;
+        float ancho = tamEsAlto ? tam * tex.width / (float)tex.height : tam;
+        float alto = ancho * tex.height / (float)tex.width;
+        var go = new GameObject(nombre, typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(padre != null ? padre : transform, false);
+        go.transform.localPosition = base_;
+        var malla = new Mesh { name = "Imagen " + nombre };
+        malla.vertices = new[] { new Vector3(-ancho / 2, 0, 0), new Vector3(ancho / 2, 0, 0), new Vector3(-ancho / 2, alto, 0), new Vector3(ancho / 2, alto, 0) };
+        malla.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1), new Vector2(1, 1) };
+        malla.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+        malla.RecalculateBounds();
+        go.GetComponent<MeshFilter>().sharedMesh = malla;
+        Material m;
+        if (!matsSprite.TryGetValue(nombre, out m))
+        {
+            if (shaderSprite == null) shaderSprite = Shader.Find("Sprites/Default");
+            m = new Material(shaderSprite) { mainTexture = tex, name = "Imagen " + nombre };
+            matsSprite[nombre] = m;
+        }
+        var r = go.GetComponent<MeshRenderer>();
+        r.sharedMaterial = m;
+        r.shadowCastingMode = ShadowCastingMode.Off;
+        r.receiveShadows = false;
+        if (camara != null) go.transform.rotation = camara.transform.rotation;
+        carteles.Add(go.transform);
+        // Sombra suave en el suelo (las imágenes no proyectan sombra)
+        return go;
+    }
+
+    /// <summary>Edificio de Flow sobre su parcela: la esquina delantera de la imagen se apoya en la esquina del solar más cercana a la cámara.</summary>
+    private GameObject Edificio2D(string nombre, Transform padre, Vector3 centro, float ancho)
+    {
+        Vector3 esquina = centro + HaciaCamara * (ancho * 0.5f) + Vector3.up * 0.12f;
+        return Sprite2D(nombre, padre, esquina, ancho);
+    }
+
+    /// <summary>¿Hay imágenes de Flow para la ciudad?</summary>
+    private static bool HaySprites { get { return Resources.Load<Texture2D>("Sprites/edificio_casa") != null; } }
 
     private static float s_giroActual;
 
@@ -742,8 +811,8 @@ public partial class Ciudad3D : MonoBehaviour
             {
                 float f = 0.07f * zoom;
                 desplazamiento += Quaternion.Euler(0, GiroCamara, 0) * new Vector3(-delta.x * f, 0, -delta.y * f);
-                desplazamiento.x = Mathf.Clamp(desplazamiento.x, -30f, 30f);
-                desplazamiento.z = Mathf.Clamp(desplazamiento.z, -30f, 34f);
+                desplazamiento.x = Mathf.Clamp(desplazamiento.x, -Paso * 2f, Paso * 2f);
+                desplazamiento.z = Mathf.Clamp(desplazamiento.z, -Paso * 2.2f, Paso * 2.2f);
             }
         }
         if (pulsado && puntero.press.wasReleasedThisFrame)

@@ -163,7 +163,7 @@ public partial class Ciudad3D
             Cinta("Calle", LineaCurva(new Vector3(-largo, 0, c), new Vector3(largo, 0, c)), 4.4f, 0.05f, matCalle, mAdoquin);
         }
         // Césped bajo cada solar, con borde de piedra; cada parcela con su giro y tamaño (nada perfectamente alineado)
-        for (int i = 0; i < Solares.Length; i++)
+        for (int i = 0; i < Solares.Length && !HaySprites; i++)
         {
             Vector3 s = Curva(Solares[i]);
             float t = 9.4f + ((i * 5) % 3 - 1) * 0.5f;
@@ -176,6 +176,16 @@ public partial class Ciudad3D
     private void PlazaFuente()
     {
         Losa("Plaza", new Vector3(0, 0.07f, 0), new Vector3(10f, 0.06f, 10f), texAdoquin, 2.2f);
+        if (Sprite2D("fuente", transform, HaciaCamara * 3.0f + Vector3.up * 0.1f, 6.4f) != null)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * Mathf.PI / 2f + Mathf.PI / 4f;
+                Maceta(new Vector3(Mathf.Cos(a) * 4.4f, 0.1f, Mathf.Sin(a) * 4.4f), i);
+                Banco(new Vector3(Mathf.Cos(a + Mathf.PI / 4f) * 4.4f, 0.1f, Mathf.Sin(a + Mathf.PI / 4f) * 4.4f), 0f);
+            }
+            return;
+        }
         Color piedra = Paleta.Hex("F1EBE2"), agua = Paleta.Hex("7CC4E8");
         Pieza(PrimitiveType.Cylinder, "Pila", new Vector3(0, 0.45f, 0), new Vector3(4.6f, 0.38f, 4.6f), piedra);
         Pieza(PrimitiveType.Cylinder, "Agua", new Vector3(0, 0.84f, 0), new Vector3(4.1f, 0.02f, 4.1f), agua);
@@ -197,6 +207,7 @@ public partial class Ciudad3D
 
     private void Farola(Vector3 p)
     {
+        if (Sprite2D("farola", transform, Curva(p), 4.6f, true) != null) return;
         Color hierro = Paleta.Hex("3E4B4A");
         Transform f = new GameObject("Farola").transform;
         f.SetParent(transform, false);
@@ -218,6 +229,7 @@ public partial class Ciudad3D
 
     private void Banco(Vector3 p, float giro)
     {
+        if (Sprite2D("banco", transform, Curva(p), 2.1f) != null) return;
         Transform b = new GameObject("Banco").transform;
         b.SetParent(transform, false);
         b.localPosition = Curva(p);
@@ -233,6 +245,7 @@ public partial class Ciudad3D
 
     private void Maceta(Vector3 p, int k)
     {
+        if (Sprite2D("maceta_flores", transform, Curva(p), 1.1f) != null) return;
         Transform m = new GameObject("Maceta").transform;
         m.SetParent(transform, false);
         m.localPosition = Curva(p);
@@ -245,7 +258,15 @@ public partial class Ciudad3D
     private static readonly string[] Hojas = { "8CC65A", "7DBA4E", "98CF62", "84C257" };
 
     /// <summary>Árbol redondo y suave (copa de varias esferas), como los de la imagen de referencia.</summary>
-    private void Arbol(Vector3 p, int k, float tam = 3.4f) { ArbolEn(transform, Curva(p), k, tam); }
+    private static readonly string[] ArbolesFlow = { "arbol", "arbol_pino", "arbol_flores", "arbol", "arbol_2" };
+
+    private void Arbol(Vector3 p, int k, float tam = 3.4f)
+    {
+        float t = tam * 1.45f * (0.88f + ((k * 37) % 10) * 0.03f);
+        for (int i = 0; i < ArbolesFlow.Length; i++)
+            if (Sprite2D(ArbolesFlow[(k + i) % ArbolesFlow.Length], transform, Curva(p), t, true) != null) return;
+        ArbolEn(transform, Curva(p), k, tam);
+    }
 
     private void ArbolEn(Transform padre, Vector3 p, int k, float tam)
     {
@@ -272,6 +293,7 @@ public partial class Ciudad3D
 
     private void Arbusto(Vector3 p, int k)
     {
+        if (Sprite2D(k % 3 == 0 && Resources.Load<Texture2D>("Sprites/macizo_flores") != null ? "macizo_flores" : "arbusto_flores", transform, Curva(p), 1.7f) != null) return;
         Transform t = new GameObject("Arbusto").transform;
         t.SetParent(transform, false);
         t.localPosition = Curva(p);

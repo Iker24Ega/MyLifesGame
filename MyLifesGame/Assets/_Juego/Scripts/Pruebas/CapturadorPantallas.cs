@@ -82,6 +82,17 @@ public class CapturadorPantallas : MonoBehaviour
         j.SimularAusencia(6 * 60);
         yield return Esperar(0.5f);
         yield return Captura("12_regreso");
+        j.TerminarRegreso(new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>>());
+        string[] extra = { "estudiar", "meditar", "quedar" };
+        for (int k = 0; k < extra.Length; k++)
+        {
+            j.EmpezarAccion(j.Tabla.Buscar(extra[k]));
+            j.MinutoJuego += 20;
+            yield return Esperar(0.6f);
+            yield return Captura((13 + k) + "_cronometro_" + extra[k]);
+            j.CancelarAccion();
+            yield return Esperar(0.2f);
+        }
 
         File.WriteAllText(Path.Combine(Carpeta, "capturas_hechas.txt"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         string enCurso = Path.Combine(Carpeta, "capturas_en_curso.txt");

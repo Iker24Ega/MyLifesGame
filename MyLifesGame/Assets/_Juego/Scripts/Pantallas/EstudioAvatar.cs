@@ -55,9 +55,17 @@ public static class EstudioAvatar
         luz.transform.localPosition = new Vector3(2.5f, 4f, 5f);
     }
 
+    /// <summary>Pone al avatar del estudio a hacer una acción (id de la tabla) o nada ("").</summary>
+    public static void PonerAccion(string id)
+    {
+        Preparar();
+        avatar.Accion = id ?? "";
+    }
+
     public static void Actualizar(TipoEstadoAvatar estado, string colorSudadera)
     {
         Preparar();
+        avatar.Accion = "";
         avatar.PonerRopa(colorSudadera);
         avatar.PonerEstado(estado);
     }

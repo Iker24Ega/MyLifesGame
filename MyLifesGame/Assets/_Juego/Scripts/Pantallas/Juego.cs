@@ -191,6 +191,7 @@ public class Juego : MonoBehaviour
     {
         if (string.IsNullOrEmpty(texto)) return;
         aviso.text = texto;
+        Sonidos.Aviso();
         aviso.transform.parent.gameObject.SetActive(true);
         aviso.transform.parent.SetAsLastSibling();
         finAviso = Time.unscaledTime + 3.5f;
@@ -410,7 +411,11 @@ public class Juego : MonoBehaviour
     {
         var mensajes = new List<string>();
         if (Progreso.Comprada(p.id)) Progreso.Poner(p);
-        else pAvatar.MostrarAviso(Progreso.Comprar(p, mensajes));
+        else
+        {
+            pAvatar.MostrarAviso(Progreso.Comprar(p, mensajes));
+            if (Progreso.Comprada(p.id)) Sonidos.Moneda();
+        }
         Ciudad.PonerRopa(Catalogos.BuscarPrenda(Progreso.Datos.ropaPuesta).colorHex);
         AvisarTodos(mensajes);
         GuardarAhora();

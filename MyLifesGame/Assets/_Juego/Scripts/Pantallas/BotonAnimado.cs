@@ -6,7 +6,7 @@ public class BotonAnimado : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 {
     private float objetivo = 1f;
 
-    public void OnPointerDown(PointerEventData e) { objetivo = 0.94f; }
+    public void OnPointerDown(PointerEventData e) { objetivo = 0.94f; Sonidos.Toque(); }
     public void OnPointerUp(PointerEventData e) { objetivo = 1f; }
     public void OnPointerExit(PointerEventData e) { objetivo = 1f; }
 

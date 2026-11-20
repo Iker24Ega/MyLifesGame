@@ -7,20 +7,45 @@ public class PantallaCronometro : Pantalla
 {
     private readonly Text nombre, lugar, tiempo, estado, info;
     private readonly FormasUI anillo;
-    private readonly FormasUI icono;
+    private readonly FormasUI icono, interior;
     private readonly Text[] flechas = new Text[5];
     private float escala = 1f;
     private DefinicionAccion accion;
 
     public PantallaCronometro(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla cronómetro")
     {
-        nombre = TextoEnFila("", 100, 66, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        lugar = TextoEnFila("", 50, 34, Paleta.TextoSuave, TextAnchor.MiddleCenter);
+        nombre = TextoEnFila("", 84, 60, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        lugar = TextoEnFila("", 44, 32, Paleta.TextoSuave, TextAnchor.MiddleCenter);
 
-        RectTransform filaAnillo = UIFabrica.Fila(columna, "Anillo", 640);
+        // Escena: interior del lugar con el avatar 3D haciendo la acción
+        RectTransform filaEscena = UIFabrica.Fila(columna, "Escena", 420);
+        Image marco = UIFabrica.Caja(filaEscena, "Marco", Paleta.Tarjeta);
+        UIFabrica.Anclar(marco.rectTransform, 0, 0, 1, 1);
+        UIFabrica.Sombra(marco, 6f, 0.12f);
+        marco.gameObject.AddComponent<RectMask2D>();
+        RectTransform zf = UIFabrica.Crear("Interior", marco.transform);
+        UIFabrica.Anclar(zf, 0, 0, 1, 1);
+        interior = FormasUI.En(zf.gameObject);
+        interior.raycastTarget = false;
+        Image sombraAv = UIFabrica.Caja(marco.transform, "Sombra", new Color(0.29f, 0.2f, 0.15f, 0.18f));
+        sombraAv.sprite = UIFabrica.Circulo; sombraAv.type = Image.Type.Simple;
+        sombraAv.rectTransform.anchorMin = sombraAv.rectTransform.anchorMax = new Vector2(0.5f, 0.1f);
+        sombraAv.rectTransform.sizeDelta = new Vector2(220, 46);
+        var retrato = new GameObject("Avatar 3D", typeof(RectTransform)).AddComponent<RawImage>();
+        retrato.transform.SetParent(marco.transform, false);
+        retrato.texture = EstudioAvatar.Textura;
+        retrato.raycastTarget = false;
+        RectTransform rr = retrato.rectTransform;
+        rr.anchorMin = new Vector2(0.5f, 0f); rr.anchorMax = new Vector2(0.5f, 0.94f); rr.pivot = new Vector2(0.5f, 0f);
+        rr.offsetMin = new Vector2(0, 4); rr.offsetMax = new Vector2(0, 0);
+        var ajuste = retrato.gameObject.AddComponent<AspectRatioFitter>();
+        ajuste.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
+        ajuste.aspectRatio = 768f / 960f;
+
+        RectTransform filaAnillo = UIFabrica.Fila(columna, "Anillo", 470);
         RectTransform zona = UIFabrica.Crear("Zona anillo", filaAnillo);
         zona.anchorMin = zona.anchorMax = new Vector2(0.5f, 0.5f);
-        zona.sizeDelta = new Vector2(600, 600);
+        zona.sizeDelta = new Vector2(460, 460);
         Image fondo = UIFabrica.Caja(zona, "Fondo", Paleta.Tarjeta);
         fondo.sprite = UIFabrica.Circulo; fondo.type = Image.Type.Simple;
         UIFabrica.Anclar(fondo.rectTransform, 0.06f, 0.06f, 0.94f, 0.94f);
@@ -29,17 +54,17 @@ public class PantallaCronometro : Pantalla
         UIFabrica.Anclar(capaAnillo, 0, 0, 1, 1);
         anillo = FormasUI.En(capaAnillo.gameObject);
         anillo.raycastTarget = false;
-        icono = Iconos.Crear(zona, Area.Fisico, 110f);
+        icono = Iconos.Crear(zona, Area.Fisico, 84f);
         icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0.5f, 0.72f);
-        tiempo = UIFabrica.Texto(zona, "", 104, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        tiempo = UIFabrica.Texto(zona, "", 82, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
         UIFabrica.Anclar(tiempo.rectTransform, 0, 0.36f, 1, 0.6f);
-        estado = UIFabrica.Texto(zona, "", 34, Paleta.Verde, TextAnchor.MiddleCenter, FontStyle.Bold);
+        estado = UIFabrica.Texto(zona, "", 28, Paleta.Verde, TextAnchor.MiddleCenter, FontStyle.Bold);
         UIFabrica.Anclar(estado.rectTransform, 0.1f, 0.22f, 0.9f, 0.36f);
 
         info = TextoEnFila("", 50, 26, Paleta.TextoSuave, TextAnchor.MiddleCenter);
 
         // Efectos en vivo
-        RectTransform filaVivo = UIFabrica.Fila(columna, "En vivo", 150);
+        RectTransform filaVivo = UIFabrica.Fila(columna, "En vivo", 130);
         Image tv = Tarjeta(filaVivo);
         foreach (Area area in Areas.Todas)
         {
@@ -65,6 +90,8 @@ public class PantallaCronometro : Pantalla
         info.text = "Zona óptima: " + PantallaHacer.Rango(a) + " · Demasiado desde " + Jornada.Duracion(a.demasiadoDesde);
         escala = a.demasiadoDesde * 1.35f;
         Iconos.Dibujar(icono, Iconos.AreaDeAccion(a.id), true);
+        Rect rc = interior.rectTransform.rect;
+        Interiores.Dibujar(interior, a.id, rc.height > 1f ? rc.width / rc.height : 2.3f);
         foreach (Area area in Areas.Todas)
         {
             float v = a.efectoHora.Get(area);
@@ -79,6 +106,7 @@ public class PantallaCronometro : Pantalla
         DefinicionAccion a = juego.AccionEnCurso;
         if (a == null) return;
         if (a != accion) Preparar(a);
+        EstudioAvatar.PonerAccion(a.id);
 
         float segundos = (juego.MinutoJuego - juego.InicioAccion) * 60f;
         int total = Mathf.FloorToInt(segundos);

@@ -105,7 +105,8 @@ public class PantallaResultado : Pantalla
             antes[i] = Mathf.Clamp(despues[i] - r.cambios[i], 0f, 100f);
         }
         inicioAnimacion = Time.unscaledTime;
-        if (r.tramo == TramoDosis.ZonaOptima) confeti.Lanzar();
+        if (r.tramo == TramoDosis.ZonaOptima) { confeti.Lanzar(); Sonidos.Exito(); }
+        else Sonidos.Fin();
         subtitulo.text = r.accion.nombre + " · " + Jornada.Duracion(r.minutos);
         switch (r.tramo)
         {

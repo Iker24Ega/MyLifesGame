@@ -286,6 +286,7 @@ public class Juego : MonoBehaviour
     public void Mostrar(Pantalla pantalla)
     {
         if (actual != null && actual != pantalla) { actual.Ocultar(); anterior = actual; }
+        if (pantalla != pCronometro) EstudioAvatar.QuitarEscena();
         actual = pantalla;
         pantalla.Mostrar();
         pantalla.Actualizar();

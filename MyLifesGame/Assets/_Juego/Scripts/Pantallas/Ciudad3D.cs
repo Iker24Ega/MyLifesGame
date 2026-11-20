@@ -121,7 +121,7 @@ public partial class Ciudad3D : MonoBehaviour
         camara.backgroundColor = Paleta.Hex("F6E7CF");
         camara.farClipPlane = 400f;
         camara.nearClipPlane = 1f;
-        camara.cullingMask &= ~(1 << EstudioAvatar.Capa);
+        camara.cullingMask &= ~((1 << EstudioAvatar.Capa) | (1 << EstudioAvatar.CapaEscena));
         var datosCam = camara.GetUniversalAdditionalCameraData();
         if (datosCam != null)
         {

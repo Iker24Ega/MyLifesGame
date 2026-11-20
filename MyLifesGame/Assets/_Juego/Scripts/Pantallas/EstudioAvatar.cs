@@ -12,6 +12,13 @@ public static class EstudioAvatar
     private static readonly Vector3 Lugar = new Vector3(900f, 0f, 900f);
     private static RenderTexture textura;
     private static Avatar3D avatar;
+    private static Transform raizEstudio;
+    /// <summary>Capa de las salas 3D (solo la ve la cámara de escena).</summary>
+    public const int CapaEscena = 31;
+    private static Camera camEscena;
+    private static RenderTexture texEscena;
+    private static Transform salas;
+    private static string salaActual, accionSala;
     private static Camera camara;
 
     public static RenderTexture Textura
@@ -25,6 +32,7 @@ public static class EstudioAvatar
         var raiz = new GameObject("Estudio avatar").transform;
         raiz.position = Lugar;
         Object.DontDestroyOnLoad(raiz.gameObject);
+        raizEstudio = raiz;
 
         avatar = Avatar3D.Crear(raiz, Capa);
         avatar.transform.localRotation = Quaternion.Euler(0, 18, 0);
@@ -51,8 +59,69 @@ public static class EstudioAvatar
         luz.range = 20f;
         luz.intensity = 6f;
         luz.color = new Color(1f, 0.95f, 0.88f);
-        luz.cullingMask = 1 << Capa;
+        luz.cullingMask = (1 << Capa) | (1 << CapaEscena);
         luz.transform.localPosition = new Vector3(2.5f, 4f, 5f);
+    }
+
+    /// <summary>Textura panorámica con la sala 3D y el avatar haciendo la acción (cronómetro).</summary>
+    public static RenderTexture TexturaEscena
+    {
+        get { Preparar(); PrepararEscena(); return texEscena; }
+    }
+
+    private static void PrepararEscena()
+    {
+        if (texEscena != null) return;
+        texEscena = new RenderTexture(810, 1440, 24, RenderTextureFormat.ARGB32) { name = "Escena avatar", antiAliasing = 4 };
+        camEscena = new GameObject("Cámara escena").AddComponent<Camera>();
+        camEscena.transform.SetParent(raizEstudio, false);
+        camEscena.transform.localPosition = new Vector3(8.5f, 8.2f, 15.5f);
+        camEscena.transform.LookAt(Lugar + new Vector3(-0.8f, 2.1f, 0.2f));
+        camEscena.fieldOfView = 40f;
+        camEscena.clearFlags = CameraClearFlags.SolidColor;
+        camEscena.backgroundColor = Paleta.Hex("F3E9DC");
+        camEscena.cullingMask = (1 << Capa) | (1 << CapaEscena);
+        camEscena.targetTexture = texEscena;
+        camEscena.nearClipPlane = 0.5f;
+        camEscena.farClipPlane = 60f;
+        var datos = camEscena.GetUniversalAdditionalCameraData();
+        if (datos != null) datos.renderPostProcessing = false;
+        camEscena.enabled = false;
+        salas = new GameObject("Salas").transform;
+        salas.SetParent(raizEstudio, false);
+        // Luz de relleno cálida para las salas
+        var luz = new GameObject("Luz sala").AddComponent<Light>();
+        luz.transform.SetParent(salas, false);
+        luz.type = LightType.Point;
+        luz.range = 30f;
+        luz.intensity = 3.5f;
+        luz.color = new Color(1f, 0.93f, 0.84f);
+        luz.cullingMask = (1 << Capa) | (1 << CapaEscena);
+        luz.transform.localPosition = new Vector3(-2f, 6.5f, 4f);
+    }
+
+    /// <summary>Monta la sala de la acción (gimnasio, biblioteca...) y enciende la cámara de escena.</summary>
+    public static void PonerEscena(string accion)
+    {
+        Preparar(); PrepararEscena();
+        string sala = Salas3D.SalaDe(accion);
+        if (sala != salaActual || accion != accionSala)
+        {
+            for (int i = salas.childCount - 1; i >= 0; i--)
+                if (salas.GetChild(i).GetComponent<Light>() == null) Object.Destroy(salas.GetChild(i).gameObject);
+            var cont = new GameObject("Sala " + sala).transform;
+            cont.SetParent(salas, false);
+            Salas3D.Construir(cont, sala, accion);
+            foreach (Transform t in cont.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = CapaEscena;
+            salaActual = sala; accionSala = accion;
+        }
+        camEscena.enabled = true;
+        avatar.transform.localRotation = Quaternion.Euler(0, 30, 0);
+    }
+
+    public static void QuitarEscena()
+    {
+        if (camEscena != null) camEscena.enabled = false;
     }
 
     /// <summary>Pone al avatar del estudio a hacer una acción (id de la tabla) o nada ("").</summary>
@@ -67,6 +136,7 @@ public static class EstudioAvatar
     {
         Preparar();
         avatar.Accion = "";
+        avatar.transform.localRotation = Quaternion.Euler(0, 18, 0);
         avatar.PonerRopa(colorSudadera);
         avatar.PonerEstado(estado);
     }

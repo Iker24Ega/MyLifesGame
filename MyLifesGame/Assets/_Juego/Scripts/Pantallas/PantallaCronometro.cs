@@ -2,103 +2,156 @@ using MyLifesGame.Motor;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Acción en curso: anillo de dosis (Poco / Zona óptima / Demasiado) con el tiempo dentro y efectos en vivo.</summary>
+/// <summary>
+/// Acción en curso, como la imagen de referencia "Acción en curso": la sala 3D a pantalla completa con el avatar
+/// haciendo la acción, tarjeta con el tiempo arriba, barra de dosis (Poco / Zona óptima / Demasiado) con marcador,
+/// efectos en vivo sobre las cinco áreas abajo y los botones Cancelar / Terminar.
+/// </summary>
 public class PantallaCronometro : Pantalla
 {
-    private readonly Text nombre, lugar, tiempo, estado, info;
-    private readonly FormasUI anillo;
-    private readonly FormasUI icono, interior;
-    private readonly Text[] flechas = new Text[5];
-    private float escala = 1f;
+    private readonly Text haciendo, tiempo, lugar, estado, info;
+    private readonly Text[] etiquetasDosis = new Text[3];
+    private readonly FormasUI anillo, icono, barra;
+    private readonly FormasUI[] flechas = new FormasUI[5];
+    private readonly RawImage escena;
+    private float escala = 1f, barraW = 6f;
     private DefinicionAccion accion;
 
     public PantallaCronometro(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla cronómetro")
     {
-        nombre = TextoEnFila("", 84, 60, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        lugar = TextoEnFila("", 44, 32, Paleta.TextoSuave, TextAnchor.MiddleCenter);
+        // Sala 3D a pantalla completa, detrás de todo
+        escena = new GameObject("Sala 3D", typeof(RectTransform)).AddComponent<RawImage>();
+        escena.transform.SetParent(raizRT, false);
+        escena.transform.SetAsFirstSibling();
+        escena.texture = EstudioAvatar.TexturaEscena;
+        escena.raycastTarget = false;
+        UIFabrica.Anclar(escena.rectTransform, 0, 0, 1, 1);
 
-        // Escena: interior del lugar con el avatar 3D haciendo la acción
-        RectTransform filaEscena = UIFabrica.Fila(columna, "Escena", 420);
-        Image marco = UIFabrica.Caja(filaEscena, "Marco", Paleta.Tarjeta);
-        UIFabrica.Anclar(marco.rectTransform, 0, 0, 1, 1);
-        UIFabrica.Sombra(marco, 6f, 0.12f);
-        marco.gameObject.AddComponent<RectMask2D>();
-        RectTransform zf = UIFabrica.Crear("Interior", marco.transform);
-        UIFabrica.Anclar(zf, 0, 0, 1, 1);
-        interior = FormasUI.En(zf.gameObject);
-        interior.raycastTarget = false;
-        Image sombraAv = UIFabrica.Caja(marco.transform, "Sombra", new Color(0.29f, 0.2f, 0.15f, 0.18f));
-        sombraAv.sprite = UIFabrica.Circulo; sombraAv.type = Image.Type.Simple;
-        sombraAv.rectTransform.anchorMin = sombraAv.rectTransform.anchorMax = new Vector2(0.5f, 0.1f);
-        sombraAv.rectTransform.sizeDelta = new Vector2(220, 46);
-        var retrato = new GameObject("Avatar 3D", typeof(RectTransform)).AddComponent<RawImage>();
-        retrato.transform.SetParent(marco.transform, false);
-        retrato.texture = EstudioAvatar.Textura;
-        retrato.raycastTarget = false;
-        RectTransform rr = retrato.rectTransform;
-        rr.anchorMin = new Vector2(0.5f, 0f); rr.anchorMax = new Vector2(0.5f, 0.94f); rr.pivot = new Vector2(0.5f, 0f);
-        rr.offsetMin = new Vector2(0, 4); rr.offsetMax = new Vector2(0, 0);
-        var ajuste = retrato.gameObject.AddComponent<AspectRatioFitter>();
-        ajuste.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
-        ajuste.aspectRatio = 768f / 960f;
-
-        RectTransform filaAnillo = UIFabrica.Fila(columna, "Anillo", 470);
-        RectTransform zona = UIFabrica.Crear("Zona anillo", filaAnillo);
-        zona.anchorMin = zona.anchorMax = new Vector2(0.5f, 0.5f);
-        zona.sizeDelta = new Vector2(460, 460);
-        Image fondo = UIFabrica.Caja(zona, "Fondo", Paleta.Tarjeta);
-        fondo.sprite = UIFabrica.Circulo; fondo.type = Image.Type.Simple;
-        UIFabrica.Anclar(fondo.rectTransform, 0.06f, 0.06f, 0.94f, 0.94f);
-        UIFabrica.Sombra(fondo, 8f, 0.12f);
-        RectTransform capaAnillo = UIFabrica.Crear("Capa anillo", zona);
-        UIFabrica.Anclar(capaAnillo, 0, 0, 1, 1);
-        anillo = FormasUI.En(capaAnillo.gameObject);
+        // Tarjeta superior: anillo pequeño + qué haces + tiempo + lugar
+        RectTransform filaTiempo = UIFabrica.Fila(columna, "Tiempo", 250);
+        Image tt = UIFabrica.Caja(filaTiempo, "Tarjeta tiempo", Paleta.Tarjeta);
+        UIFabrica.Anclar(tt.rectTransform, 0.06f, 0, 0.94f, 1);
+        UIFabrica.Sombra(tt, 10f, 0.18f);
+        RectTransform za = UIFabrica.Crear("Anillo", tt.transform);
+        za.anchorMin = za.anchorMax = new Vector2(0, 0.5f);
+        za.sizeDelta = new Vector2(190, 190);
+        za.anchoredPosition = new Vector2(130, 0);
+        anillo = FormasUI.En(za.gameObject);
         anillo.raycastTarget = false;
-        icono = Iconos.Crear(zona, Area.Fisico, 84f);
-        icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0.5f, 0.72f);
-        tiempo = UIFabrica.Texto(zona, "", 82, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        UIFabrica.Anclar(tiempo.rectTransform, 0, 0.36f, 1, 0.6f);
-        estado = UIFabrica.Texto(zona, "", 28, Paleta.Verde, TextAnchor.MiddleCenter, FontStyle.Bold);
-        UIFabrica.Anclar(estado.rectTransform, 0.1f, 0.22f, 0.9f, 0.36f);
+        icono = Iconos.Crear(za, Area.Fisico, 92f);
+        haciendo = UIFabrica.Texto(tt.transform, "", 40, Paleta.TextoSuave, TextAnchor.MiddleLeft, FontStyle.Bold);
+        UIFabrica.Anclar(haciendo.rectTransform, 0.3f, 0.7f, 0.98f, 0.92f);
+        tiempo = UIFabrica.Texto(tt.transform, "", 104, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
+        UIFabrica.Anclar(tiempo.rectTransform, 0.29f, 0.26f, 0.99f, 0.74f);
+        lugar = UIFabrica.Texto(tt.transform, "", 34, Paleta.TextoSuave, TextAnchor.MiddleLeft, FontStyle.Bold);
+        UIFabrica.Anclar(lugar.rectTransform, 0.3f, 0.06f, 0.98f, 0.28f);
 
-        info = TextoEnFila("", 50, 26, Paleta.TextoSuave, TextAnchor.MiddleCenter);
+        // Barra de dosis
+        RectTransform filaDosis = UIFabrica.Fila(columna, "Dosis", 170);
+        Image td = UIFabrica.Caja(filaDosis, "Tarjeta dosis", new Color(1f, 0.99f, 0.97f, 0.94f));
+        UIFabrica.Anclar(td.rectTransform, 0.06f, 0, 0.94f, 1);
+        UIFabrica.Sombra(td, 8f, 0.15f);
+        RectTransform zb = UIFabrica.Crear("Barra", td.transform);
+        UIFabrica.Anclar(zb, 0.05f, 0.52f, 0.95f, 0.84f);
+        barra = FormasUI.En(zb.gameObject);
+        barra.raycastTarget = false;
+        string[] nombres = { "Poco", "Zona óptima", "Demasiado" };
+        for (int i = 0; i < 3; i++)
+        {
+            etiquetasDosis[i] = UIFabrica.Texto(td.transform, nombres[i], 30, Paleta.TextoSuave, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFabrica.Anclar(etiquetasDosis[i].rectTransform, 0.05f + i * 0.3f, 0.26f, 0.35f + i * 0.3f, 0.48f);
+        }
+        estado = UIFabrica.Texto(td.transform, "", 28, Paleta.Verde, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(estado.rectTransform, 0.05f, 0.03f, 0.95f, 0.26f);
 
-        // Efectos en vivo
-        RectTransform filaVivo = UIFabrica.Fila(columna, "En vivo", 130);
-        Image tv = Tarjeta(filaVivo);
+        UIFabrica.Relleno(columna);
+
+        // Efectos en vivo sobre las cinco áreas
+        RectTransform filaVivo = UIFabrica.Fila(columna, "En vivo", 190);
+        Image tv = UIFabrica.Caja(filaVivo, "Tarjeta vivo", new Color(1f, 0.99f, 0.97f, 0.95f));
+        UIFabrica.Anclar(tv.rectTransform, 0, 0, 1, 1);
+        UIFabrica.Sombra(tv, 10f, 0.18f);
         foreach (Area area in Areas.Todas)
         {
             int i = (int)area;
-            FormasUI ic = Iconos.Crear(tv.transform, area, 64f);
-            ic.rectTransform.anchorMin = ic.rectTransform.anchorMax = new Vector2((i + 0.5f) / 5f, 0.62f);
-            flechas[i] = UIFabrica.Texto(tv.transform, "", 26, Paleta.TextoSuave, TextAnchor.MiddleCenter, FontStyle.Bold);
-            flechas[i].rectTransform.anchorMin = flechas[i].rectTransform.anchorMax = new Vector2((i + 0.5f) / 5f, 0.2f);
-            flechas[i].rectTransform.sizeDelta = new Vector2(180, 40);
+            FormasUI ic = Iconos.Crear(tv.transform, area, 96f);
+            ic.rectTransform.anchorMin = ic.rectTransform.anchorMax = new Vector2((i + 0.5f) / 5f, 0.6f);
+            RectTransform zf = UIFabrica.Crear("Flecha", tv.transform);
+            zf.anchorMin = zf.anchorMax = new Vector2((i + 0.5f) / 5f, 0.6f);
+            zf.sizeDelta = new Vector2(40, 40);
+            zf.anchoredPosition = new Vector2(40, 40);
+            flechas[i] = FormasUI.En(zf.gameObject);
+            flechas[i].raycastTarget = false;
+            Text n = UIFabrica.Texto(tv.transform, Areas.Nombre(area), 28, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+            n.rectTransform.anchorMin = n.rectTransform.anchorMax = new Vector2((i + 0.5f) / 5f, 0.17f);
+            n.rectTransform.sizeDelta = new Vector2(200, 40);
         }
+        info = TextoEnFila("", 44, 26, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
 
-        UIFabrica.Relleno(columna);
-        BotonEnFila("Terminar", 140, Paleta.Coral, Paleta.Blanco, 56, () => this.juego.TerminarAccion());
-        BotonEnFila("Cancelar (no cuenta)", 90, Paleta.Gris, Paleta.Texto, 32, () => this.juego.CancelarAccion());
+        // Botones
+        RectTransform filaBotones = UIFabrica.Fila(columna, "Botones", 130);
+        Button cancelar = UIFabrica.Boton(filaBotones, "Cancelar", Paleta.Tarjeta, Paleta.Texto, 40, () => this.juego.CancelarAccion());
+        UIFabrica.Anclar((RectTransform)cancelar.transform, 0, 0, 0.36f, 1);
+        Button terminar = UIFabrica.Boton(filaBotones, "Terminar", Paleta.Coral, Paleta.Blanco, 52, () => this.juego.TerminarAccion());
+        UIFabrica.Anclar((RectTransform)terminar.transform, 0.39f, 0, 1, 1);
+    }
+
+    private static string Gerundio(DefinicionAccion a)
+    {
+        switch (a.id)
+        {
+            case "entrenar": return "Entrenando";
+            case "estudiar": return "Estudiando";
+            case "trabajar": return "Trabajando";
+            case "quedar": return "Con amigos";
+            case "pasear": return "Paseando";
+            case "videojuegos": return "Jugando";
+            case "descansar": return "Descansando";
+            case "meditar": return "Meditando";
+            default: return a.nombre;
+        }
     }
 
     /// <summary>Prepara la pantalla para una acción concreta.</summary>
     public void Preparar(DefinicionAccion a)
     {
         accion = a;
-        nombre.text = a.nombre;
+        haciendo.text = Gerundio(a);
         lugar.text = a.lugar;
         info.text = "Zona óptima: " + PantallaHacer.Rango(a) + " · Demasiado desde " + Jornada.Duracion(a.demasiadoDesde);
         escala = a.demasiadoDesde * 1.35f;
         Iconos.Dibujar(icono, Iconos.AreaDeAccion(a.id), true);
-        Rect rc = interior.rectTransform.rect;
-        Interiores.Dibujar(interior, a.id, rc.height > 1f ? rc.width / rc.height : 2.3f);
         foreach (Area area in Areas.Todas)
         {
             float v = a.efectoHora.Get(area);
-            int i = (int)area;
-            flechas[i].text = v > 0.01f ? "+ sube" : v < -0.01f ? "− baja" : "·";
-            flechas[i].color = v > 0.01f ? Paleta.Verde : v < -0.01f ? Paleta.Coral : Paleta.TextoSuave;
+            FormasUI f = flechas[(int)area];
+            f.Limpiar();
+            if (v > 0.01f)
+            {
+                f.Circulo(Vector2.zero, 1f, Paleta.Verde);
+                f.Poligono(new[] { new Vector2(0, 0.62f), new Vector2(0.55f, -0.05f), new Vector2(-0.55f, -0.05f) }, Color.white);
+                f.Rect(new Vector2(0, -0.3f), new Vector2(0.3f, 0.55f), 0f, Color.white);
+            }
+            else if (v < -0.01f)
+            {
+                f.Circulo(Vector2.zero, 1f, Paleta.Coral);
+                f.Poligono(new[] { new Vector2(0, -0.62f), new Vector2(-0.55f, 0.05f), new Vector2(0.55f, 0.05f) }, Color.white);
+                f.Rect(new Vector2(0, 0.3f), new Vector2(0.3f, 0.55f), 0f, Color.white);
+            }
         }
+        AjustarEscena();
+    }
+
+    /// <summary>Recorta la textura de la sala para que llene la pantalla sin deformarse.</summary>
+    private void AjustarEscena()
+    {
+        Rect rc = raizRT.rect;
+        if (rc.height < 1f) return;
+        float aspecto = rc.width / rc.height;
+        float tex = (float)EstudioAvatar.TexturaEscena.width / EstudioAvatar.TexturaEscena.height;
+        escena.uvRect = aspecto < tex
+            ? new Rect((1f - aspecto / tex) * 0.5f, 0, aspecto / tex, 1)
+            : new Rect(0, (1f - tex / aspecto) * 0.5f, 1, tex / aspecto);
     }
 
     public override void Actualizar()
@@ -106,34 +159,61 @@ public class PantallaCronometro : Pantalla
         DefinicionAccion a = juego.AccionEnCurso;
         if (a == null) return;
         if (a != accion) Preparar(a);
+        AjustarEscena();
         EstudioAvatar.PonerAccion(a.id);
+        EstudioAvatar.PonerEscena(a.id);
 
         float segundos = (juego.MinutoJuego - juego.InicioAccion) * 60f;
         int total = Mathf.FloorToInt(segundos);
         tiempo.text = (total / 3600).ToString("00") + ":" + (total / 60 % 60).ToString("00") + ":" + (total % 60).ToString("00");
         int minutos = juego.MinutosAccion;
 
-        // Anillo: tramos de la dosis y marcador
+        // Anillo pequeño: progreso hacia "demasiado"
         anillo.Limpiar();
         float g(float m) { return Mathf.Clamp01(m / escala) * 360f; }
-        anillo.Arco(Vector2.zero, 0.88f, 0.98f, 0f, g(a.zonaMin), Paleta.TramoPoco);
-        anillo.Arco(Vector2.zero, 0.88f, 0.98f, g(a.zonaMin), g(a.zonaMax), Paleta.TramoBueno);
-        anillo.Arco(Vector2.zero, 0.88f, 0.98f, g(a.zonaMax), g(a.demasiadoDesde), Paleta.TramoLarga);
-        anillo.Arco(Vector2.zero, 0.88f, 0.98f, g(a.demasiadoDesde), 360f, Paleta.TramoDemasiado);
         float progreso = g(minutos);
-        anillo.Arco(Vector2.zero, 0.74f, 0.84f, 0f, 360f, Paleta.Fondo);
-        anillo.Arco(Vector2.zero, 0.74f, 0.84f, 0f, Mathf.Max(1f, progreso), Paleta.Coral);
-        float rad = progreso * Mathf.Deg2Rad;
-        Vector2 p = new Vector2(Mathf.Sin(rad), Mathf.Cos(rad)) * 0.93f;
-        anillo.Circulo(p, 0.085f, Paleta.Texto);
-        anillo.Circulo(p, 0.06f, Color.white);
+        anillo.Arco(Vector2.zero, 0.8f, 0.98f, 0f, 360f, Paleta.Fondo);
+        anillo.Arco(Vector2.zero, 0.8f, 0.98f, 0f, Mathf.Max(2f, progreso), Paleta.Coral);
 
-        switch (a.Tramo(minutos))
+        // Barra de dosis horizontal con marcador
+        barra.Limpiar();
+        Rect rb = barra.rectTransform.rect;
+        float W = rb.height > 1f ? rb.width / rb.height : 6f;   // FormasUI usa la mitad del lado corto como unidad
+        barraW = W;
+        float x(float m) { return -W + 2f * W * Mathf.Clamp01(m / escala); }
+        float h = 0.95f;
+        barra.Rect(new Vector2((x(0) + x(a.zonaMin)) * 0.5f, 0), new Vector2(x(a.zonaMin) - x(0), h), 0f, Paleta.TramoPoco);
+        barra.Rect(new Vector2((x(a.zonaMin) + x(a.zonaMax)) * 0.5f, 0), new Vector2(x(a.zonaMax) - x(a.zonaMin), h), 0f, Paleta.TramoBueno);
+        barra.Rect(new Vector2((x(a.zonaMax) + x(a.demasiadoDesde)) * 0.5f, 0), new Vector2(x(a.demasiadoDesde) - x(a.zonaMax), h), 0f, Paleta.TramoLarga);
+        barra.Rect(new Vector2((x(a.demasiadoDesde) + x(escala)) * 0.5f, 0), new Vector2(x(escala) - x(a.demasiadoDesde), h), 0f, Paleta.TramoDemasiado);
+        barra.Circulo(new Vector2(-W, 0), h * 0.5f, Paleta.TramoPoco);
+        barra.Circulo(new Vector2(W, 0), h * 0.5f, Paleta.TramoDemasiado);
+        float px = x(minutos);
+        barra.Circulo(new Vector2(px, 0), 1.0f, Paleta.Texto);
+        barra.Circulo(new Vector2(px, 0), 0.9f, Color.white);
+        barra.Circulo(new Vector2(px, 0), 0.55f, Paleta.Coral);
+        // Etiquetas centradas bajo cada tramo
+        PonerEtiqueta(0, (x(0) + x(a.zonaMin)) * 0.5f);
+        PonerEtiqueta(1, (x(a.zonaMin) + x(a.zonaMax)) * 0.5f);
+        PonerEtiqueta(2, (x(a.demasiadoDesde) + x(escala)) * 0.5f);
+
+        TramoDosis tramo = a.Tramo(minutos);
+        etiquetasDosis[0].color = tramo == TramoDosis.Poco ? Paleta.Texto : Paleta.TextoSuave;
+        etiquetasDosis[1].color = tramo == TramoDosis.ZonaOptima ? Paleta.Verde : Paleta.TextoSuave;
+        etiquetasDosis[2].color = tramo == TramoDosis.Demasiado ? Paleta.Coral : Paleta.TextoSuave;
+        switch (tramo)
         {
-            case TramoDosis.Poco: estado.text = "Poco"; estado.color = Paleta.TextoSuave; break;
-            case TramoDosis.ZonaOptima: estado.text = "Zona óptima"; estado.color = Paleta.Verde; break;
+            case TramoDosis.Poco: estado.text = "Todavía poco: sigue un rato más"; estado.color = Paleta.TextoSuave; break;
+            case TramoDosis.ZonaOptima: estado.text = "Zona óptima: máximo efecto"; estado.color = Paleta.Verde; break;
             case TramoDosis.Larga: estado.text = "Algo larga (sin bonus)"; estado.color = Paleta.Texto; break;
             default: estado.text = "Demasiado: cansa más de lo que aporta"; estado.color = Paleta.Coral; break;
         }
+    }
+
+    private void PonerEtiqueta(int i, float centro)
+    {
+        // centro en -1..1 dentro de la barra (que ocupa 0.05-0.95 de la tarjeta)
+        float u = 0.05f + (centro / barraW + 1f) * 0.5f * 0.9f;
+        UIFabrica.Anclar(etiquetasDosis[i].rectTransform, u - 0.16f, 0.26f, u + 0.16f, 0.48f);
     }
 }

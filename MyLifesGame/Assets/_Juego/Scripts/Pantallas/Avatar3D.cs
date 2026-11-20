@@ -18,9 +18,11 @@ public class Avatar3D : MonoBehaviour
 
     /// <summary>Altura del personaje en unidades del mundo (la ciudad y los retratos están pensados para ~4).</summary>
     public const float Altura = 3.9f;
-    private const float EscalaCabeza = 1.6f;
-    private const float EscalaPiernas = 0.82f;
-    private const float EscalaBrazos = 0.9f;
+    private float EscalaCabeza = 1.6f;
+    private float EscalaPiernas = 0.82f;
+    private float EscalaBrazos = 0.9f;
+    /// <summary>true si usa el personaje generado (Flow → TRELLIS → Mixamo) en lugar del de Quaternius.</summary>
+    public bool Generado { get; private set; }
     private float caida;
     private int fotogramas;
 
@@ -55,6 +57,7 @@ public class Avatar3D : MonoBehaviour
 
     private void Construir()
     {
+        if (ConstruirGenerado()) return;
         GameObject prefab = Resources.Load<GameObject>("Personajes/Chico");
         if (prefab == null) { Debug.LogError("[Avatar] Falta Resources/Personajes/Chico"); return; }
         GameObject go = Instantiate(prefab, transform, false);
@@ -94,6 +97,107 @@ public class Avatar3D : MonoBehaviour
 
         PrepararAnimaciones(go);
         CrearAccesorios();
+    }
+
+    /// <summary>
+    /// Personaje generado a partir de la hoja de personaje de Flow, con esqueleto humanoide de Mixamo y sus
+    /// animaciones. Ya tiene las proporciones y la cara de la imagen: no se agranda la cabeza ni se pintan ojos.
+    /// </summary>
+    private bool ConstruirGenerado()
+    {
+        GameObject prefab = Resources.Load<GameObject>("Modelos3D/personaje/personaje_rig");
+        if (prefab == null) return false;
+        Animator anim = prefab.GetComponentInChildren<Animator>();
+#if UNITY_EDITOR
+        try
+        {
+            System.IO.File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "..", "Automatizacion", "diag_generado.txt"),
+                "animator=" + (anim != null) + " avatar=" + (anim != null && anim.avatar != null) +
+                (anim != null && anim.avatar != null ? " humano=" + anim.avatar.isHuman + " valido=" + anim.avatar.isValid : "") +
+                " hijos=" + prefab.transform.childCount + "\n");
+        }
+        catch (System.Exception) { }
+#endif
+        if (anim == null || anim.avatar == null || !anim.avatar.isHuman || !anim.avatar.isValid) return false;
+
+        GameObject go = Instantiate(prefab, transform, false);
+        go.name = "Modelo";
+        modelo = go.transform;
+        Generado = true;
+        EscalaCabeza = 1f; EscalaPiernas = 1f; EscalaBrazos = 1f;
+        foreach (Collider c in go.GetComponentsInChildren<Collider>()) Destroy(c);
+        animador = go.GetComponentInChildren<Animator>();
+
+        cabeza = H(HumanBodyBones.Head); cuello = H(HumanBodyBones.Neck);
+        pecho = H(HumanBodyBones.UpperChest) ?? H(HumanBodyBones.Chest); cadera = H(HumanBodyBones.Hips);
+        brazoI = H(HumanBodyBones.LeftUpperArm); brazoD = H(HumanBodyBones.RightUpperArm);
+        codoI = H(HumanBodyBones.LeftLowerArm); codoD = H(HumanBodyBones.RightLowerArm);
+        munecaI = H(HumanBodyBones.LeftHand); munecaD = H(HumanBodyBones.RightHand);
+        musloI = H(HumanBodyBones.LeftUpperLeg); musloD = H(HumanBodyBones.RightUpperLeg);
+        rodillaI = H(HumanBodyBones.LeftLowerLeg); rodillaD = H(HumanBodyBones.RightLowerLeg);
+        pieI = H(HumanBodyBones.LeftFoot); pieD = H(HumanBodyBones.RightFoot);
+
+        // Textura: la del GLB original (Mixamo no la conserva); el mallado y sus UV son los mismos
+        Material[] mats = Modelos3D.MaterialesDe("personaje_base");
+        foreach (Renderer r in go.GetComponentsInChildren<Renderer>())
+        {
+            if (mats != null && mats.Length > 0)
+            {
+                var lista = new Material[r.sharedMaterials.Length];
+                for (int i = 0; i < lista.Length; i++) lista[i] = mats[Mathf.Min(i, mats.Length - 1)];
+                r.sharedMaterials = lista;
+            }
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            var smr = r as SkinnedMeshRenderer;
+            if (smr != null) smr.updateWhenOffscreen = true;
+        }
+
+        modelo.localScale = Vector3.one;
+        modelo.localPosition = Vector3.zero;
+        modelo.localRotation = Quaternion.identity;
+        float alto = AltoModelo();
+        escala = alto > 0.01f ? Altura / alto : 1f;
+        modelo.localScale = Vector3.one * escala;
+        if (pieI != null) alturaTobillo = transform.InverseTransformPoint(pieI.position).y;
+        float suelo = float.MaxValue;
+        foreach (Renderer r in go.GetComponentsInChildren<Renderer>()) suelo = Mathf.Min(suelo, transform.InverseTransformPoint(r.bounds.min).y);
+        caida = suelo < float.MaxValue ? -suelo : 0f;
+        GuardarPies();
+
+        foreach (AnimationClip c in Resources.LoadAll<AnimationClip>("Modelos3D/personaje"))
+            if (!c.name.StartsWith("__preview__") && !clips.ContainsKey(c.name)) clips[c.name] = c;
+        animador.applyRootMotion = false;
+        animador.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        grafo = PlayableGraph.Create("Avatar");
+        grafo.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+        mezcla = AnimationMixerPlayable.Create(grafo, 2);
+        var salida = AnimationPlayableOutput.Create(grafo, "Avatar", animador);
+        salida.SetSourcePlayable(mezcla);
+        grafo.Play();
+        Reproducir("Idle", 0f);
+        CrearAccesorios();
+        return true;
+    }
+
+    private Transform H(HumanBodyBones b) { return animador != null ? animador.GetBoneTransform(b) : null; }
+
+    // Nombres de animación de Quaternius → Mixamo (el personaje generado usa las de Mixamo)
+    private static readonly Dictionary<string, string[]> Alias = new Dictionary<string, string[]>
+    {
+        { "Walk", new[] { "Walking" } }, { "Idle_Neutral", new[] { "Idle" } },
+        { "Curl", new[] { "Bicep Curl", "BicepCurl" } }, { "Sentado", new[] { "Sitting Idle", "Sitting" } },
+        { "Teclear", new[] { "Typing" } }, { "Estirar", new[] { "Neck Stretching", "Stretching" } },
+        { "Celebrar", new[] { "Cheering" } }, { "Saludar", new[] { "Waving", "Wave" } },
+    };
+
+    private bool Tiene(string nombre) { return Buscar(nombre) != null; }
+
+    private string Buscar(string nombre)
+    {
+        if (clips.ContainsKey(nombre)) return nombre;
+        string[] a;
+        if (Alias.TryGetValue(nombre, out a)) foreach (string n in a) if (clips.ContainsKey(n)) return n;
+        return null;
     }
 
     private Transform Hueso(string nombre)
@@ -269,7 +373,10 @@ public class Avatar3D : MonoBehaviour
     {
         if (!grafo.IsValid()) return;
         AnimationClip c;
-        if (!clips.TryGetValue(nombre, out c)) { if (!clips.TryGetValue("Idle", out c)) return; nombre = "Idle"; }
+        string real = Buscar(nombre);
+        if (real == null) real = "Idle";
+        if (!clips.TryGetValue(real, out c)) return;
+        nombre = real;
         if (nombre == clipActual)
         {
             Playable p0 = mezcla.GetInput(0);
@@ -321,8 +428,13 @@ public class Avatar3D : MonoBehaviour
         string a = Caminando ? "" : (Accion ?? "");
         if (a != accionMostrada) MostrarAccesorios(a);
 
-        if (Caminando) Reproducir("Walk", 0.2f, 1.15f);
+        if (Caminando) Reproducir("Walk", 0.2f, Generado ? 1f : 1.15f);
         else if (a == "pasear") Reproducir("Walk", 0.25f, 0.9f);
+        else if (Generado && a == "entrenar" && Tiene("Curl")) Reproducir("Curl", 0.3f);
+        else if (Generado && a == "celebrar" && Tiene("Celebrar")) Reproducir("Celebrar", 0.3f);
+        else if (Generado && a == "estirarse" && Tiene("Estirar")) Reproducir("Estirar", 0.3f);
+        else if (Generado && a == "trabajar" && Tiene("Teclear")) Reproducir("Teclear", 0.3f);
+        else if (Generado && EsSentado(a) && Tiene("Sentado")) Reproducir("Sentado", 0.3f);
         else if (a == "quedar" || a == "estirarse" || a == "celebrar") Reproducir("Idle", 0.3f);
         else if (a == "entrenar" || EsSentado(a) || a == "meditar") Reproducir("Idle_Neutral", 0.3f);
         else if (estadoAvatar == TipoEstadoAvatar.Cansado || estadoAvatar == TipoEstadoAvatar.Descuidado) Reproducir("Idle_Neutral", 0.4f, 0.7f);
@@ -363,6 +475,11 @@ public class Avatar3D : MonoBehaviour
             else if (estadoAvatar == TipoEstadoAvatar.Descuidado) { Girar(pecho, X, 14f); Girar(cabeza, X, 16f); }
             else if (estadoAvatar == TipoEstadoAvatar.EnForma && !Caminando) { Girar(pecho, X, -4f); Girar(cabeza, X, -4f); }
         }
+        else if ((a == "estirarse" && Generado && Tiene("Estirar")) || (a == "celebrar" && Generado && Tiene("Celebrar"))
+                 || (a == "entrenar" && Generado && Tiene("Curl")) || (a == "trabajar" && Generado && Tiene("Teclear")))
+        {
+            // Animación real de Mixamo: nada que posar a mano
+        }
         else if (a == "estirarse" || a == "celebrar")
         {
             float c = a == "celebrar" ? Mathf.Abs(Mathf.Sin(t * 5f)) : (Mathf.Sin(t * 1.4f) + 1f) * 0.5f;
@@ -396,8 +513,12 @@ public class Avatar3D : MonoBehaviour
         }
         else if (EsSentado(a))
         {
-            Girar(musloI, X, -88f); Girar(musloD, X, -88f);
-            Girar(rodillaI, X, 88f); Girar(rodillaD, X, 88f);
+            bool animSentado = Generado && Tiene("Sentado");
+            if (!animSentado)
+            {
+                Girar(musloI, X, -88f); Girar(musloD, X, -88f);
+                Girar(rodillaI, X, 88f); Girar(rodillaD, X, 88f);
+            }
             if (a == "descansar")
             {
                 Girar(pecho, X, -12f + Mathf.Sin(t * 1.2f) * 1.5f);
@@ -411,13 +532,14 @@ public class Avatar3D : MonoBehaviour
             else
             {
                 float j = a == "videojuegos" ? Mathf.Sin(t * 14f) * 4f : 0f;
-                Girar(brazoI, X, -38f + j); Girar(brazoD, X, -38f - j);
-                Girar(codoI, X, -55f); Girar(codoD, X, -55f);
+                float br = Generado ? -18f : -38f, co = Generado ? -35f : -55f; // el generado ya trae los brazos más altos
+                Girar(brazoI, X, br + j); Girar(brazoD, X, br - j);
+                Girar(codoI, X, co); Girar(codoD, X, co);
                 Girar(pecho, X, 6f + Mathf.Sin(t * 1.6f) * 1.5f);
                 Girar(cabeza, X, 10f);
             }
             SeguirPies();
-            ApoyarEnSuelo(false);
+            if (!animSentado) ApoyarEnSuelo(false);
         }
         SeguirPies();
         ColocarAccesorios(a);

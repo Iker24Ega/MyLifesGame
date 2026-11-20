@@ -68,6 +68,15 @@ public static class Modelos3D
         return c;
     }
 
+    /// <summary>Materiales (ya en versión mate) del primer renderizador de un modelo generado, o null.</summary>
+    public static Material[] MaterialesDe(string nombre)
+    {
+        GameObject g = Cargar(nombre);
+        if (g == null) return null;
+        Renderer r = g.GetComponentInChildren<Renderer>();
+        return r != null ? Mates(r.sharedMaterials) : null;
+    }
+
     private static GameObject Cargar(string nombre)
     {
         GameObject g;

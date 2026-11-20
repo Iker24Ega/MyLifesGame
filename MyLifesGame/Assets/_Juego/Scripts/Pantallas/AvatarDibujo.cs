@@ -3,82 +3,69 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Dibujo 2D sencillo del avatar (cabeza, pelo, ojos, sudadera, mochila) que cambia de
-/// postura y ambiente según su estado. El cuerpo nunca cambia (regla de diseño 5.6).
+/// Retrato del avatar en la interfaz: el avatar 3D del estudio (el mismo que el de la ciudad) sobre una
+/// pequeña habitación cuyo ambiente cambia según su estado. El cuerpo nunca cambia (regla de diseño 5.6).
 /// </summary>
 public class AvatarDibujo
 {
-    private readonly Image fondo, cuerpo, adorno;
-    private readonly RectTransform figura;
+    private readonly Image fondo, suelo;
+    private readonly FormasUI ventana;
     private readonly Text extra;
 
     public AvatarDibujo(Transform padre)
     {
         fondo = UIFabrica.Caja(padre, "Avatar", Paleta.Tarjeta);
         UIFabrica.Anclar(fondo.rectTransform, 0, 0, 1, 1);
+        fondo.gameObject.AddComponent<RectMask2D>();
 
-        figura = UIFabrica.Crear("Figura", fondo.transform);
-        figura.anchorMin = figura.anchorMax = new Vector2(0.5f, 0.45f);
-        figura.sizeDelta = new Vector2(260, 420);
+        RectTransform zv = UIFabrica.Crear("Ventana", fondo.transform);
+        UIFabrica.Anclar(zv, 0.06f, 0.5f, 0.3f, 0.9f);
+        ventana = FormasUI.En(zv.gameObject);
+        ventana.raycastTarget = false;
 
-        Image mochila = Pieza("Mochila", Paleta.Mochila, new Vector2(0, -40), new Vector2(230, 200), false);
-        mochila.rectTransform.anchoredPosition = new Vector2(0, -30);
-        cuerpo = Pieza("Sudadera", Paleta.Hex("2FA3A0"), new Vector2(0, -70), new Vector2(200, 220), false);
-        Pieza("Vaqueros", Paleta.Vaquero, new Vector2(0, -205), new Vector2(150, 90), false);
-        Pieza("Cuello", Paleta.Piel, new Vector2(0, 40), new Vector2(60, 40), false);
-        Pieza("Cabeza", Paleta.Piel, new Vector2(0, 110), new Vector2(150, 150), true);
-        Image pelo = Pieza("Pelo", Paleta.Pelo, new Vector2(0, 165), new Vector2(156, 70), false);
-        pelo.rectTransform.anchoredPosition = new Vector2(0, 160);
-        Pieza("Ojo izquierdo", Paleta.Texto, new Vector2(-30, 110), new Vector2(18, 22), true);
-        Pieza("Ojo derecho", Paleta.Texto, new Vector2(30, 110), new Vector2(18, 22), true);
-        Pieza("Sonrisa", Paleta.Coral, new Vector2(0, 75), new Vector2(46, 10), false);
+        suelo = UIFabrica.Caja(fondo.transform, "Suelo", Paleta.Hex("E8D9C2"), false);
+        UIFabrica.Anclar(suelo.rectTransform, 0, 0, 1, 0.24f);
 
-        adorno = Pieza("Medalla", Paleta.Hex("E3B341"), new Vector2(60, -40), new Vector2(40, 40), true);
+        Image sombra = UIFabrica.Caja(fondo.transform, "Sombra", new Color(0.29f, 0.2f, 0.15f, 0.16f));
+        sombra.sprite = UIFabrica.Circulo; sombra.type = Image.Type.Simple;
+        sombra.rectTransform.anchorMin = sombra.rectTransform.anchorMax = new Vector2(0.5f, 0.17f);
+        sombra.rectTransform.sizeDelta = new Vector2(230, 50);
+
+        var retrato = new GameObject("Retrato 3D", typeof(RectTransform)).AddComponent<RawImage>();
+        retrato.transform.SetParent(fondo.transform, false);
+        retrato.texture = EstudioAvatar.Textura;
+        retrato.raycastTarget = false;
+        RectTransform rt = retrato.rectTransform;
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 0f);
+        rt.offsetMin = new Vector2(0, 0);
+        rt.offsetMax = new Vector2(0, -6);
+        var ajuste = retrato.gameObject.AddComponent<AspectRatioFitter>();
+        ajuste.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
+        ajuste.aspectRatio = 768f / 960f;
+
         extra = UIFabrica.Texto(fondo.transform, "", 64, Paleta.TextoSuave, TextAnchor.UpperRight, FontStyle.Bold);
-        UIFabrica.Anclar(extra.rectTransform, 0.55f, 0.6f, 0.92f, 0.95f);
-    }
-
-    private Image Pieza(string nombre, Color color, Vector2 posicion, Vector2 tam, bool redonda)
-    {
-        Image img = UIFabrica.Caja(figura, nombre, color);
-        if (redonda) { img.sprite = UIFabrica.Circulo; img.type = Image.Type.Simple; }
-        RectTransform rt = img.rectTransform;
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = tam;
-        rt.anchoredPosition = posicion;
-        return img;
+        UIFabrica.Anclar(extra.rectTransform, 0.6f, 0.62f, 0.94f, 0.95f);
     }
 
     public void Actualizar(TipoEstadoAvatar estado, string colorSudadera)
     {
-        cuerpo.color = Paleta.Hex(colorSudadera);
-        adorno.gameObject.SetActive(estado == TipoEstadoAvatar.EnForma);
+        EstudioAvatar.Actualizar(estado, colorSudadera);
+        Color cielo;
         switch (estado)
         {
-            case TipoEstadoAvatar.EnForma:
-                fondo.color = Paleta.Hex("FFF1D6");
-                figura.localRotation = Quaternion.identity;
-                figura.anchoredPosition = new Vector2(0, 10);
-                extra.text = "";
-                break;
-            case TipoEstadoAvatar.Cansado:
-                fondo.color = Paleta.Hex("E9E3DA");
-                figura.localRotation = Quaternion.Euler(0, 0, -6);
-                figura.anchoredPosition = new Vector2(0, -15);
-                extra.text = "Zz";
-                break;
-            case TipoEstadoAvatar.Descuidado:
-                fondo.color = Paleta.Hex("DCD6E3");
-                figura.localRotation = Quaternion.Euler(0, 0, 4);
-                figura.anchoredPosition = new Vector2(0, -35);
-                extra.text = "?";
-                break;
-            default:
-                fondo.color = Paleta.Tarjeta;
-                figura.localRotation = Quaternion.identity;
-                figura.anchoredPosition = Vector2.zero;
-                extra.text = "";
-                break;
+            case TipoEstadoAvatar.EnForma: fondo.color = Paleta.Hex("FFEFD2"); cielo = Paleta.Hex("A9D8F2"); extra.text = "★"; extra.color = Paleta.Hex("E3B341"); break;
+            case TipoEstadoAvatar.Cansado: fondo.color = Paleta.Hex("EAE2D6"); cielo = Paleta.Hex("C9C2D8"); extra.text = "Zz"; extra.color = Paleta.TextoSuave; break;
+            case TipoEstadoAvatar.Descuidado: fondo.color = Paleta.Hex("DDD6E4"); cielo = Paleta.Hex("8E94B5"); extra.text = "?"; extra.color = Paleta.TextoSuave; break;
+            default: fondo.color = Paleta.Hex("F8EEDF"); cielo = Paleta.Hex("BFE0F2"); extra.text = ""; break;
         }
+        suelo.color = Color.Lerp(fondo.color, Paleta.Hex("C9A27A"), 0.35f);
+        ventana.Limpiar();
+        ventana.Rect(Vector2.zero, new Vector2(1.9f, 1.9f), 0f, Paleta.Blanco);
+        ventana.Rect(Vector2.zero, new Vector2(1.66f, 1.66f), 0f, cielo);
+        ventana.Circulo(new Vector2(0.4f, 0.4f), 0.22f, estado == TipoEstadoAvatar.Descuidado ? Paleta.Hex("E8E4D8") : Paleta.Hex("FFD66B"));
+        ventana.Rect(Vector2.zero, new Vector2(0.08f, 1.66f), 0f, Paleta.Blanco);
+        ventana.Rect(Vector2.zero, new Vector2(1.66f, 0.08f), 0f, Paleta.Blanco);
     }
 }

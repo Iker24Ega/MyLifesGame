@@ -24,10 +24,10 @@ public class PantallaEquilibrio : Pantalla
         Text titulo = UIFabrica.Texto(cabecera, "Tu equilibrio", 56, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
         UIFabrica.Anclar(titulo.rectTransform, 0.12f, 0, 0.88f, 1);
 
-        RectTransform filaRadar = UIFabrica.Fila(columna, "Radar", 560);
+        RectTransform filaRadar = UIFabrica.Fila(columna, "Radar", 640);
         RectTransform zona = UIFabrica.Crear("Zona radar", filaRadar);
         zona.anchorMin = zona.anchorMax = new Vector2(0.5f, 0.5f);
-        zona.sizeDelta = new Vector2(400, 400);
+        zona.sizeDelta = new Vector2(470, 470);
         radar = FormasUI.En(zona.gameObject);
         radar.raycastTarget = false;
 
@@ -47,14 +47,14 @@ public class PantallaEquilibrio : Pantalla
         {
             int i = (int)area;
             float ang = Mathf.PI / 2f - i * 2f * Mathf.PI / 5f;
-            Vector2 pos = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * 250f;
+            Vector2 pos = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * 272f;
             FormasUI icono = Iconos.Crear(zona, area, 66f);
             icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             icono.rectTransform.anchoredPosition = pos;
             Text nombre = UIFabrica.Texto(zona, Areas.Nombre(area), 30, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
             nombre.rectTransform.anchorMin = nombre.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             nombre.rectTransform.sizeDelta = new Vector2(220, 40);
-            nombre.rectTransform.anchoredPosition = pos + new Vector2(0, pos.y >= 0 ? 52 : -52);
+            nombre.rectTransform.anchoredPosition = pos + new Vector2(0, pos.y >= 0 ? 48 : -48);
         }
 
         TextoEnFila("Amarillo: Poco (< 30) · Verde: Zona buena · Azul: Alto (> 80)", 40, 24, Paleta.TextoSuave, TextAnchor.MiddleCenter);
@@ -62,7 +62,7 @@ public class PantallaEquilibrio : Pantalla
         foreach (Area area in Areas.Todas)
         {
             int i = (int)area;
-            RectTransform fila = UIFabrica.Fila(columna, Areas.Nombre(area), 118);
+            RectTransform fila = UIFabrica.Fila(columna, Areas.Nombre(area), 108);
             Image t = Tarjeta(fila);
             FormasUI icono = Iconos.Crear(t.transform, area, 64f);
             icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0, 0.5f);

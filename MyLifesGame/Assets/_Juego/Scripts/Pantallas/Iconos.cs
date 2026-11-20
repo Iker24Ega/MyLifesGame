@@ -21,6 +21,11 @@ public static class Iconos
         Color fondo = Paleta.DeArea(area);
         Color trazo = conFondo ? Color.white : fondo;
         if (conFondo) f.Circulo(Vector2.zero, 1f, fondo);
+        DibujarTrazo(f, area, trazo, conFondo);
+    }
+
+    private static void DibujarTrazo(FormasUI f, Area area, Color trazo, bool conFondo = true)
+    {
         switch (area)
         {
             case Area.Fisico:
@@ -64,5 +69,110 @@ public static class Iconos
             case "pasear": case "descansar": return Area.Energia;
             default: return Area.Animo;
         }
+    }
+
+    /// <summary>Carita de 0 (fatal) a 4 (genial) sobre un círculo de color.</summary>
+    public static void Carita(FormasUI f, int nivel, Color fondo, bool dormida = false)
+    {
+        f.Limpiar();
+        f.Circulo(Vector2.zero, 1f, fondo);
+        Color trazo = Paleta.Texto;
+        if (dormida)
+        {
+            f.Arco(new Vector2(-0.32f, 0.22f), 0.1f, 0.18f, 100f, 260f, trazo);
+            f.Arco(new Vector2(0.32f, 0.22f), 0.1f, 0.18f, 100f, 260f, trazo);
+        }
+        else
+        {
+            f.Circulo(new Vector2(-0.32f, 0.2f), 0.11f, trazo);
+            f.Circulo(new Vector2(0.32f, 0.2f), 0.11f, trazo);
+        }
+        switch (nivel)
+        {
+            case 0: f.Arco(new Vector2(0, -0.62f), 0.32f, 0.42f, -60f, 60f, trazo); break;
+            case 1: f.Arco(new Vector2(0, -0.78f), 0.4f, 0.49f, -40f, 40f, trazo); break;
+            case 2: f.Rect(new Vector2(0, -0.32f), new Vector2(0.5f, 0.1f), 0f, trazo); break;
+            case 3: f.Arco(new Vector2(0, 0.02f), 0.38f, 0.47f, 130f, 230f, trazo); break;
+            default:
+                f.Arco(new Vector2(0, -0.08f), 0f, 0.46f, 90f, 270f, trazo);
+                f.Arco(new Vector2(0, -0.08f), 0f, 0.3f, 120f, 240f, Paleta.Coral);
+                break;
+        }
+        if (nivel >= 3)
+        {
+            Color mejilla = new Color(1f, 0.55f, 0.5f, 0.45f);
+            f.Circulo(new Vector2(-0.6f, -0.12f), 0.13f, mejilla);
+            f.Circulo(new Vector2(0.6f, -0.12f), 0.13f, mejilla);
+        }
+    }
+
+    /// <summary>Sol de mañana con rayos.</summary>
+    public static void Sol(FormasUI f)
+    {
+        f.Limpiar();
+        Color rayo = Paleta.Hex("F6C453");
+        for (int i = 0; i < 12; i++)
+        {
+            float a = i * 30f * Mathf.Deg2Rad;
+            Vector2 d = new Vector2(Mathf.Sin(a), Mathf.Cos(a));
+            f.Linea(d * 0.66f, d * 0.95f, 0.1f, rayo);
+        }
+        f.Circulo(Vector2.zero, 0.55f, Paleta.Hex("FFD66B"));
+        f.Circulo(new Vector2(-0.18f, 0.06f), 0.06f, Paleta.Texto);
+        f.Circulo(new Vector2(0.18f, 0.06f), 0.06f, Paleta.Texto);
+        f.Arco(new Vector2(0, -0.04f), 0.18f, 0.24f, 120f, 240f, Paleta.Texto);
+    }
+
+    /// <summary>Sudadera con capucha del color indicado (para la tienda).</summary>
+    public static void Sudadera(FormasUI f, Color c, bool bloqueada)
+    {
+        f.Limpiar();
+        if (bloqueada) c = Color.Lerp(c, Paleta.Gris, 0.75f);
+        Color osc = Color.Lerp(c, Color.black, 0.18f);
+        f.Rect(new Vector2(-0.55f, -0.12f), new Vector2(0.3f, 0.92f), -18f, osc);
+        f.Rect(new Vector2(0.55f, -0.12f), new Vector2(0.3f, 0.92f), 18f, osc);
+        f.Circulo(new Vector2(0, 0.42f), 0.36f, osc);
+        f.Rect(new Vector2(0, -0.12f), new Vector2(0.92f, 1.0f), 0f, c);
+        f.Circulo(new Vector2(0, 0.38f), 0.2f, Color.Lerp(osc, Color.black, 0.25f));
+        f.Rect(new Vector2(0, -0.46f), new Vector2(0.56f, 0.22f), 0f, osc);
+        f.Linea(new Vector2(-0.1f, 0.24f), new Vector2(-0.12f, -0.06f), 0.05f, Paleta.Blanco);
+        f.Linea(new Vector2(0.1f, 0.24f), new Vector2(0.12f, -0.06f), 0.05f, Paleta.Blanco);
+        f.Rect(new Vector2(0, -0.6f), new Vector2(0.92f, 0.08f), 0f, osc);
+    }
+
+    /// <summary>Medalla de logro: con el icono del área si está conseguido; con candado si no.</summary>
+    public static void Medalla(FormasUI f, Area area, bool conseguido)
+    {
+        f.Limpiar();
+        if (!conseguido)
+        {
+            f.Circulo(Vector2.zero, 1f, Paleta.Hex("DDD3C5"));
+            f.Circulo(Vector2.zero, 0.8f, Paleta.Hex("E9E1D5"));
+            Color c = Paleta.Hex("B3A694");
+            f.Arco(new Vector2(0, 0.12f), 0.2f, 0.32f, -90f, 90f, c);
+            f.Rect(new Vector2(-0.26f, 0.06f), new Vector2(0.12f, 0.14f), 0f, c);
+            f.Rect(new Vector2(0.26f, 0.06f), new Vector2(0.12f, 0.14f), 0f, c);
+            f.Rect(new Vector2(0, -0.22f), new Vector2(0.72f, 0.5f), 0f, c);
+            f.Circulo(new Vector2(0, -0.2f), 0.08f, Paleta.Hex("E9E1D5"));
+            return;
+        }
+        Color col = Paleta.DeArea(area);
+        // Cintas
+        f.Rect(new Vector2(-0.3f, -0.75f), new Vector2(0.3f, 0.7f), 18f, Color.Lerp(col, Color.black, 0.2f));
+        f.Rect(new Vector2(0.3f, -0.75f), new Vector2(0.3f, 0.7f), -18f, Color.Lerp(col, Color.black, 0.2f));
+        f.Circulo(Vector2.zero, 1f, Paleta.Hex("E3B341"));
+        f.Circulo(Vector2.zero, 0.86f, Paleta.Hex("F6D26B"));
+        f.Circulo(Vector2.zero, 0.72f, col);
+        // Icono del área encima, a menor escala
+        IconoEscalado(f, area, 0.62f);
+        f.Arco(Vector2.zero, 0.62f, 0.72f, 300f, 340f, new Color(1, 1, 1, 0.35f));
+    }
+
+    private static void IconoEscalado(FormasUI f, Area area, float k)
+    {
+        // Reutiliza el dibujo del icono en un FormasUI auxiliar escalando coordenadas.
+        f.Escala = k;
+        DibujarTrazo(f, area, Color.white);
+        f.Escala = 1f;
     }
 }

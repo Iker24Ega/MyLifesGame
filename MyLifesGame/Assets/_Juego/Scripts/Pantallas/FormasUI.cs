@@ -30,6 +30,9 @@ public class FormasUI : MaskableGraphic
         return go.AddComponent<FormasUI>();
     }
 
+    /// <summary>Escala que se aplica a las formas que se añadan a partir de ahora (alrededor del centro).</summary>
+    public float Escala = 1f;
+
     public int NumFormas { get { return formas.Count; } }
     public int UltimosVertices { get; private set; }
 
@@ -37,30 +40,36 @@ public class FormasUI : MaskableGraphic
 
     public void Circulo(Vector2 c, float r, Color col)
     {
-        formas.Add(new Forma { tipo = Tipo.Circulo, a = c, r1 = r, color = col }); SetVerticesDirty();
+        formas.Add(new Forma { tipo = Tipo.Circulo, a = c * Escala, r1 = r * Escala, color = col }); SetVerticesDirty();
     }
 
     /// <summary>Anillo o arco entre los radios r0 y r1. Ángulos en grados, en el sentido del reloj desde arriba.</summary>
     public void Arco(Vector2 c, float r0, float r1, float ang0, float ang1, Color col)
     {
-        formas.Add(new Forma { tipo = Tipo.Arco, a = c, r0 = r0, r1 = r1, ang0 = ang0, ang1 = ang1, color = col }); SetVerticesDirty();
+        formas.Add(new Forma { tipo = Tipo.Arco, a = c * Escala, r0 = r0 * Escala, r1 = r1 * Escala, ang0 = ang0, ang1 = ang1, color = col }); SetVerticesDirty();
     }
 
     public void Rect(Vector2 c, Vector2 tam, float rotGrados, Color col)
     {
-        formas.Add(new Forma { tipo = Tipo.Rect, a = c, b = tam, rot = rotGrados, color = col }); SetVerticesDirty();
+        formas.Add(new Forma { tipo = Tipo.Rect, a = c * Escala, b = tam * Escala, rot = rotGrados, color = col }); SetVerticesDirty();
     }
 
     /// <summary>Polígono convexo (o en estrella respecto a "centro" si se indica).</summary>
     public void Poligono(Vector2[] puntos, Color col, Vector2? centro = null)
     {
-        formas.Add(new Forma { tipo = Tipo.Poligono, puntos = puntos, color = col, abanicoDesdeA = centro.HasValue, a = centro ?? Vector2.zero });
+        if (!Mathf.Approximately(Escala, 1f))
+        {
+            var p = new Vector2[puntos.Length];
+            for (int i = 0; i < p.Length; i++) p[i] = puntos[i] * Escala;
+            puntos = p;
+        }
+        formas.Add(new Forma { tipo = Tipo.Poligono, puntos = puntos, color = col, abanicoDesdeA = centro.HasValue, a = (centro ?? Vector2.zero) * Escala });
         SetVerticesDirty();
     }
 
     public void Linea(Vector2 desde, Vector2 hasta, float grosor, Color col)
     {
-        formas.Add(new Forma { tipo = Tipo.Linea, a = desde, b = hasta, r1 = grosor, color = col }); SetVerticesDirty();
+        formas.Add(new Forma { tipo = Tipo.Linea, a = desde * Escala, b = hasta * Escala, r1 = grosor * Escala, color = col }); SetVerticesDirty();
     }
 
     protected override void OnPopulateMesh(VertexHelper vh)

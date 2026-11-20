@@ -12,6 +12,11 @@ public class PantallaResultado : Pantalla
     private readonly Text subtitulo, tramo, recompensas, notas, pregunta;
     private readonly Text[] cambios = new Text[5];
     private readonly Text[] nuevos = new Text[5];
+    private readonly Image[] barras = new Image[5];
+    private readonly Image[] barrasAntes = new Image[5];
+    private readonly float[] antes = new float[5], despues = new float[5];
+    private float inicioAnimacion;
+    private readonly Confeti confeti;
     private readonly RectTransform filaValoracion, filaMotivos;
     private readonly Button[] botonesMotivo = new Button[5];
     private ResultadoAccion resultado;
@@ -35,10 +40,18 @@ public class PantallaResultado : Pantalla
             ic.rectTransform.anchoredPosition = new Vector2(34, 0);
             Text n = UIFabrica.Texto(fila, Areas.Nombre(area), 38, Paleta.Texto);
             UIFabrica.Anclar(n.rectTransform, 0.12f, 0, 0.45f, 1);
-            cambios[i] = UIFabrica.Texto(fila, "", 44, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UIFabrica.Anclar(cambios[i].rectTransform, 0.45f, 0, 0.7f, 1);
-            nuevos[i] = UIFabrica.Texto(fila, "", 32, Paleta.TextoSuave, TextAnchor.MiddleRight);
-            UIFabrica.Anclar(nuevos[i].rectTransform, 0.7f, 0, 1f, 1);
+            cambios[i] = UIFabrica.Texto(fila, "", 40, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFabrica.Anclar(cambios[i].rectTransform, 0.4f, 0, 0.54f, 1);
+            Image fondoBarra = UIFabrica.Caja(fila, "Fondo barra", Paleta.Gris);
+            UIFabrica.Anclar(fondoBarra.rectTransform, 0.56f, 0.32f, 0.88f, 0.68f);
+            barrasAntes[i] = UIFabrica.Caja(fondoBarra.transform, "Antes", Color.Lerp(Paleta.DeArea(area), Paleta.Blanco, 0.55f));
+            barrasAntes[i].type = Image.Type.Filled; barrasAntes[i].fillMethod = Image.FillMethod.Horizontal;
+            UIFabrica.Anclar(barrasAntes[i].rectTransform, 0, 0, 1, 1);
+            barras[i] = UIFabrica.Caja(fondoBarra.transform, "Ahora", Paleta.DeArea(area));
+            barras[i].type = Image.Type.Filled; barras[i].fillMethod = Image.FillMethod.Horizontal;
+            UIFabrica.Anclar(barras[i].rectTransform, 0, 0, 1, 1);
+            nuevos[i] = UIFabrica.Texto(fila, "", 32, Paleta.Texto, TextAnchor.MiddleRight, FontStyle.Bold);
+            UIFabrica.Anclar(nuevos[i].rectTransform, 0.88f, 0, 1f, 1);
         }
 
         recompensas = TextoEnFila("", 50, 34, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -64,12 +77,35 @@ public class PantallaResultado : Pantalla
 
         UIFabrica.Relleno(columna);
         BotonEnFila("Continuar", 130, Paleta.Verde, Paleta.Blanco, 52, () => this.juego.IrAPestana(0));
+        confeti = Confeti.Crear(raizRT);
+    }
+
+    public override void Actualizar()
+    {
+        if (resultado == null) return;
+        float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Time.unscaledTime - inicioAnimacion - 0.25f) / 0.9f));
+        for (int i = 0; i < 5; i++)
+        {
+            float v = Mathf.Lerp(antes[i], despues[i], k);
+            bool sube = despues[i] >= antes[i];
+            barras[i].fillAmount = (sube ? v : despues[i]) / 100f;
+            barrasAntes[i].fillAmount = (sube ? antes[i] : v) / 100f;
+            nuevos[i].text = Mathf.RoundToInt(v).ToString();
+        }
     }
 
     public void Preparar(ResultadoAccion r, bool preguntar)
     {
         resultado = r;
         valoracionPendiente = 0;
+        foreach (Area area in Areas.Todas)
+        {
+            int i = (int)area;
+            despues[i] = juego.Jornada.Estado[area];
+            antes[i] = Mathf.Clamp(despues[i] - r.cambios[i], 0f, 100f);
+        }
+        inicioAnimacion = Time.unscaledTime;
+        if (r.tramo == TramoDosis.ZonaOptima) confeti.Lanzar();
         subtitulo.text = r.accion.nombre + " · " + Jornada.Duracion(r.minutos);
         switch (r.tramo)
         {
@@ -95,7 +131,6 @@ public class PantallaResultado : Pantalla
             if (d > 0) { cambios[i].text = "+" + d; cambios[i].color = Paleta.Verde; }
             else if (d < 0) { cambios[i].text = "−" + (-d); cambios[i].color = Paleta.Coral; }
             else { cambios[i].text = "0"; cambios[i].color = Paleta.TextoSuave; }
-            nuevos[i].text = "ahora " + Mathf.RoundToInt(juego.Jornada.Estado[area]);
         }
 
         var sb = new StringBuilder();

@@ -5,7 +5,10 @@ using UnityEngine.UI;
 /// <summary>Pestaña "Avatar": cómo está tu avatar, tu nivel y monedas, y la tienda de sudaderas.</summary>
 public class PantallaAvatar : Pantalla
 {
-    private readonly Text cabecera, estado, aviso;
+    private readonly Text cabecera, estado, aviso, textoXp, monedas;
+    private readonly Image barraXp;
+    private readonly Image[] tarjetasPrenda = new Image[6];
+    private readonly FormasUI[] dibujosPrenda = new FormasUI[6];
     private readonly AvatarDibujo avatar;
     private readonly Button[] botonesPrenda = new Button[6];
     private readonly Text[] textosPrenda = new Text[6];
@@ -13,27 +16,57 @@ public class PantallaAvatar : Pantalla
 
     public PantallaAvatar(Juego juego, Transform canvas) : base(juego, canvas, "Pantalla avatar", 3)
     {
-        cabecera = TextoEnFila("", 80, 44, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
-        RectTransform filaAvatar = UIFabrica.Fila(columna, "Avatar", 520);
-        avatar = new AvatarDibujo(filaAvatar);
-        estado = TextoEnFila("", 70, 34, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        // Cabecera: nivel, barra de XP y monedas
+        RectTransform cab = UIFabrica.Fila(columna, "Cabecera", 96);
+        Image pildoraNivel = UIFabrica.Caja(cab, "Nivel", Paleta.Coral);
+        UIFabrica.Anclar(pildoraNivel.rectTransform, 0, 0.12f, 0.2f, 0.88f);
+        cabecera = UIFabrica.Texto(pildoraNivel.transform, "", 36, Paleta.Blanco, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(cabecera.rectTransform, 0, 0, 1, 1);
+        Image fondoXp = UIFabrica.Caja(cab, "Fondo XP", Paleta.Gris);
+        UIFabrica.Anclar(fondoXp.rectTransform, 0.23f, 0.36f, 0.66f, 0.64f);
+        barraXp = UIFabrica.Caja(fondoXp.transform, "XP", Paleta.Verde);
+        barraXp.type = Image.Type.Filled; barraXp.fillMethod = Image.FillMethod.Horizontal;
+        UIFabrica.Anclar(barraXp.rectTransform, 0, 0, 1, 1);
+        textoXp = UIFabrica.Texto(cab, "", 22, Paleta.TextoSuave, TextAnchor.UpperCenter);
+        UIFabrica.Anclar(textoXp.rectTransform, 0.23f, 0f, 0.66f, 0.34f);
+        Image pildoraMonedas = UIFabrica.Caja(cab, "Monedas", Paleta.Hex("FFE7A8"));
+        UIFabrica.Anclar(pildoraMonedas.rectTransform, 0.69f, 0.12f, 1f, 0.88f);
+        Image moneda = UIFabrica.Caja(pildoraMonedas.transform, "Moneda", Paleta.Hex("E3B341"));
+        moneda.sprite = UIFabrica.Circulo; moneda.type = Image.Type.Simple;
+        moneda.rectTransform.anchorMin = moneda.rectTransform.anchorMax = new Vector2(0, 0.5f);
+        moneda.rectTransform.sizeDelta = new Vector2(44, 44);
+        moneda.rectTransform.anchoredPosition = new Vector2(40, 0);
+        monedas = UIFabrica.Texto(pildoraMonedas.transform, "", 34, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(monedas.rectTransform, 0.25f, 0, 0.98f, 1);
 
-        TextoEnFila("Tienda de sudaderas  (monedas provisionales para la demo)", 50, 30, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
-        for (int i = 0; i < Catalogos.Prendas.Length && i < 6; i++)
+        RectTransform filaAvatar = UIFabrica.Fila(columna, "Avatar", 560);
+        avatar = new AvatarDibujo(filaAvatar);
+        estado = TextoEnFila("", 64, 30, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+
+        TextoEnFila("Tienda de sudaderas", 54, 36, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
+        for (int fila = 0; fila < 2; fila++)
         {
-            int indice = i;
-            Prenda p = Catalogos.Prendas[i];
-            RectTransform fila = UIFabrica.Fila(columna, p.nombre, 78);
-            Image t = Tarjeta(fila);
-            Image muestra = UIFabrica.Caja(t.transform, "Color", Paleta.Hex(p.colorHex));
-            muestra.sprite = UIFabrica.Circulo; muestra.type = Image.Type.Simple;
-            muestra.rectTransform.anchorMin = muestra.rectTransform.anchorMax = new Vector2(0, 0.5f);
-            muestra.rectTransform.sizeDelta = new Vector2(52, 52);
-            muestra.rectTransform.anchoredPosition = new Vector2(46, 0);
-            textosPrenda[i] = UIFabrica.Texto(t.transform, "", 28, Paleta.Texto);
-            UIFabrica.Anclar(textosPrenda[i].rectTransform, 0.11f, 0, 0.68f, 1);
-            botonesPrenda[i] = UIFabrica.Boton(t.transform, "", Paleta.Verde, Paleta.Blanco, 26, () => this.juego.ElegirPrenda(Catalogos.Prendas[indice]));
-            UIFabrica.Anclar((RectTransform)botonesPrenda[i].transform, 0.7f, 0.12f, 0.98f, 0.88f);
+            RectTransform rf = UIFabrica.Fila(columna, "Tienda " + fila, 276);
+            for (int c = 0; c < 3; c++)
+            {
+                int i = fila * 3 + c;
+                if (i >= Catalogos.Prendas.Length) break;
+                int indice = i;
+                Prenda p = Catalogos.Prendas[i];
+                Image t = UIFabrica.Caja(rf, p.nombre, Paleta.Tarjeta);
+                UIFabrica.Anclar(t.rectTransform, c / 3f + 0.008f, 0, (c + 1) / 3f - 0.008f, 1);
+                UIFabrica.Sombra(t, 5f, 0.1f);
+                tarjetasPrenda[i] = t;
+                RectTransform zd = UIFabrica.Crear("Dibujo", t.transform);
+                zd.anchorMin = zd.anchorMax = new Vector2(0.5f, 0.66f);
+                zd.sizeDelta = new Vector2(130, 130);
+                dibujosPrenda[i] = FormasUI.En(zd.gameObject);
+                dibujosPrenda[i].raycastTarget = false;
+                textosPrenda[i] = UIFabrica.Texto(t.transform, "", 24, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+                UIFabrica.Anclar(textosPrenda[i].rectTransform, 0.04f, 0.27f, 0.96f, 0.42f);
+                botonesPrenda[i] = UIFabrica.Boton(t.transform, "", Paleta.Verde, Paleta.Blanco, 24, () => this.juego.ElegirPrenda(Catalogos.Prendas[indice]));
+                UIFabrica.Anclar((RectTransform)botonesPrenda[i].transform, 0.1f, 0.05f, 0.9f, 0.24f);
+            }
         }
         aviso = TextoEnFila("", 44, 28, Paleta.Coral, TextAnchor.MiddleCenter, FontStyle.Bold);
 
@@ -48,6 +81,17 @@ public class PantallaAvatar : Pantalla
         UIFabrica.Relleno(columna);
     }
 
+    private static Color ColorEstado(TipoEstadoAvatar t)
+    {
+        switch (t)
+        {
+            case TipoEstadoAvatar.EnForma: return Paleta.Verde;
+            case TipoEstadoAvatar.Cansado: return Paleta.Hex("D9963B");
+            case TipoEstadoAvatar.Descuidado: return Paleta.Coral;
+            default: return Paleta.DeArea(Area.Mente);
+        }
+    }
+
     public void MostrarAviso(string texto) { aviso.text = texto; }
 
     protected override void AlMostrar() { aviso.text = ""; }
@@ -55,21 +99,28 @@ public class PantallaAvatar : Pantalla
     public override void Actualizar()
     {
         Progreso pr = juego.Progreso;
-        cabecera.text = "Nv. " + pr.Nivel + "  (" + pr.XpEnNivel + "/" + Progreso.XpPorNivel + " XP)   ·   " + pr.Datos.monedas + " monedas";
+        cabecera.text = "Nv. " + pr.Nivel;
+        barraXp.fillAmount = pr.XpEnNivel / (float)Progreso.XpPorNivel;
+        textoXp.text = pr.XpEnNivel + " / " + Progreso.XpPorNivel + " XP";
+        monedas.text = pr.Datos.monedas.ToString();
         string causa;
         TipoEstadoAvatar tipo = EstadoAvatar.Calcular(juego.Jornada.Estado, juego.VieneDeAusencia, out causa);
         avatar.Actualizar(tipo, Catalogos.BuscarPrenda(pr.Datos.ropaPuesta).colorHex);
-        estado.text = "Estado: " + EstadoAvatar.Nombre(tipo) + "  ·  " + causa;
+        estado.text = "<color=#" + ColorUtility.ToHtmlStringRGB(ColorEstado(tipo)) + ">● " + EstadoAvatar.Nombre(tipo) + "</color>   <size=26><color=#8A7565>" + causa + "</color></size>";
 
         for (int i = 0; i < Catalogos.Prendas.Length && i < 6; i++)
         {
             Prenda p = Catalogos.Prendas[i];
             bool tiene = pr.Comprada(p.id);
             bool puesta = pr.Datos.ropaPuesta == p.id;
-            textosPrenda[i].text = p.nombre + (tiene ? "" : "\n<size=22><color=#8A7565>" + p.precio + " monedas · nivel " + p.nivelMinimo + "</color></size>");
-            string accion = puesta ? "Puesta" : tiene ? "Poner" : "Comprar";
+            bool alcanzable = pr.Nivel >= p.nivelMinimo;
+            Iconos.Sudadera(dibujosPrenda[i], Paleta.Hex(p.colorHex), !tiene && !alcanzable);
+            string corto = p.nombre.Replace("Sudadera ", "");
+            textosPrenda[i].text = char.ToUpper(corto[0]) + corto.Substring(1);
+            tarjetasPrenda[i].color = puesta ? Paleta.Hex("E4F2E1") : Paleta.Tarjeta;
+            string accion = puesta ? "Puesta ✓" : tiene ? "Poner" : alcanzable ? "● " + p.precio : "Nivel " + p.nivelMinimo;
             UIFabrica.CambiarTexto(botonesPrenda[i], accion);
-            botonesPrenda[i].image.color = puesta ? Paleta.Gris : tiene ? Paleta.DeArea(Area.Mente) : Paleta.Verde;
+            botonesPrenda[i].image.color = puesta ? Paleta.Verde : tiene ? Paleta.DeArea(Area.Mente) : alcanzable ? Paleta.Hex("E3B341") : Paleta.Gris;
         }
         SensibilidadPantallas s = juego.Jornada.Datos.pantallas;
         UIFabrica.CambiarTexto(botonPantallas, "Pantallas antes de dormir: " + (s == SensibilidadPantallas.Nada ? "nada" : s == SensibilidadPantallas.Algo ? "algo" : "mucho"));

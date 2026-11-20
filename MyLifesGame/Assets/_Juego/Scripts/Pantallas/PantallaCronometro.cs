@@ -25,7 +25,9 @@ public class PantallaCronometro : Pantalla
         fondo.sprite = UIFabrica.Circulo; fondo.type = Image.Type.Simple;
         UIFabrica.Anclar(fondo.rectTransform, 0.06f, 0.06f, 0.94f, 0.94f);
         UIFabrica.Sombra(fondo, 8f, 0.12f);
-        anillo = FormasUI.En(zona.gameObject);
+        RectTransform capaAnillo = UIFabrica.Crear("Capa anillo", zona);
+        UIFabrica.Anclar(capaAnillo, 0, 0, 1, 1);
+        anillo = FormasUI.En(capaAnillo.gameObject);
         anillo.raycastTarget = false;
         icono = Iconos.Crear(zona, Area.Fisico, 110f);
         icono.rectTransform.anchorMin = icono.rectTransform.anchorMax = new Vector2(0.5f, 0.72f);
@@ -91,7 +93,8 @@ public class PantallaCronometro : Pantalla
         anillo.Arco(Vector2.zero, 0.88f, 0.98f, g(a.zonaMax), g(a.demasiadoDesde), Paleta.TramoLarga);
         anillo.Arco(Vector2.zero, 0.88f, 0.98f, g(a.demasiadoDesde), 360f, Paleta.TramoDemasiado);
         float progreso = g(minutos);
-        anillo.Arco(Vector2.zero, 0.8f, 0.86f, 0f, Mathf.Max(1f, progreso), Paleta.Coral);
+        anillo.Arco(Vector2.zero, 0.74f, 0.84f, 0f, 360f, Paleta.Fondo);
+        anillo.Arco(Vector2.zero, 0.74f, 0.84f, 0f, Mathf.Max(1f, progreso), Paleta.Coral);
         float rad = progreso * Mathf.Deg2Rad;
         Vector2 p = new Vector2(Mathf.Sin(rad), Mathf.Cos(rad)) * 0.93f;
         anillo.Circulo(p, 0.085f, Paleta.Texto);

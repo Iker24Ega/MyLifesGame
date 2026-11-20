@@ -20,11 +20,24 @@ public class PantallaCiudad : Pantalla
         // Cabecera: nivel, XP, reloj y monedas
         RectTransform filaCab = UIFabrica.Fila(columna, "Cabecera", 120);
         Image cab = Tarjeta(filaCab);
-        Image retrato = UIFabrica.Caja(cab.transform, "Retrato", Paleta.Hex("2FA3A0"));
+        Image retrato = UIFabrica.Caja(cab.transform, "Retrato", Paleta.Hex("FFE7C2"));
         retrato.sprite = UIFabrica.Circulo; retrato.type = Image.Type.Simple;
         retrato.rectTransform.anchorMin = retrato.rectTransform.anchorMax = new Vector2(0, 0.5f);
-        retrato.rectTransform.sizeDelta = new Vector2(90, 90);
+        retrato.rectTransform.sizeDelta = new Vector2(96, 96);
         retrato.rectTransform.anchoredPosition = new Vector2(70, 0);
+        retrato.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+        var cara = new GameObject("Cara 3D", typeof(RectTransform)).AddComponent<RawImage>();
+        cara.transform.SetParent(retrato.transform, false);
+        cara.texture = EstudioAvatar.Textura;
+        cara.uvRect = new Rect(0.22f, 0.5f, 0.56f, 0.45f);
+        cara.raycastTarget = false;
+        UIFabrica.Anclar(cara.rectTransform, 0, 0, 1, 1);
+        Image aro = UIFabrica.Caja(cab.transform, "Aro", Paleta.Coral);
+        aro.sprite = UIFabrica.Circulo; aro.type = Image.Type.Simple;
+        aro.rectTransform.anchorMin = aro.rectTransform.anchorMax = new Vector2(0, 0.5f);
+        aro.rectTransform.sizeDelta = new Vector2(104, 104);
+        aro.rectTransform.anchoredPosition = new Vector2(70, 0);
+        aro.transform.SetSiblingIndex(retrato.transform.GetSiblingIndex());
         nivel = UIFabrica.Texto(cab.transform, "", 34, Paleta.Texto, TextAnchor.MiddleLeft, FontStyle.Bold);
         UIFabrica.Anclar(nivel.rectTransform, 0.15f, 0.5f, 0.45f, 0.95f);
         Image fondoXp = UIFabrica.Caja(cab.transform, "Fondo XP", Paleta.Gris);
@@ -33,9 +46,16 @@ public class PantallaCiudad : Pantalla
         barraXp.type = Image.Type.Filled; barraXp.fillMethod = Image.FillMethod.Horizontal; barraXp.sprite = UIFabrica.Plano;
         UIFabrica.Anclar(barraXp.rectTransform, 0, 0, 1, 1);
         reloj = UIFabrica.Texto(cab.transform, "", 40, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
-        UIFabrica.Anclar(reloj.rectTransform, 0.44f, 0, 0.72f, 1);
-        monedas = UIFabrica.Texto(cab.transform, "", 34, Paleta.Texto, TextAnchor.MiddleRight, FontStyle.Bold);
-        UIFabrica.Anclar(monedas.rectTransform, 0.7f, 0, 0.96f, 1);
+        UIFabrica.Anclar(reloj.rectTransform, 0.43f, 0, 0.73f, 1);
+        Image pildora = UIFabrica.Caja(cab.transform, "Monedas", Paleta.Hex("FFE7A8"));
+        UIFabrica.Anclar(pildora.rectTransform, 0.73f, 0.2f, 0.97f, 0.8f);
+        Image moneda = UIFabrica.Caja(pildora.transform, "Moneda", Paleta.Hex("E3B341"));
+        moneda.sprite = UIFabrica.Circulo; moneda.type = Image.Type.Simple;
+        moneda.rectTransform.anchorMin = moneda.rectTransform.anchorMax = new Vector2(0, 0.5f);
+        moneda.rectTransform.sizeDelta = new Vector2(44, 44);
+        moneda.rectTransform.anchoredPosition = new Vector2(34, 0);
+        monedas = UIFabrica.Texto(pildora.transform, "", 32, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(monedas.rectTransform, 0.3f, 0, 0.95f, 1);
 
         // Las cinco áreas como medidores redondos (tocar abre "Tu equilibrio")
         RectTransform filaAreas = UIFabrica.Fila(columna, "Áreas", 130);
@@ -66,6 +86,7 @@ public class PantallaCiudad : Pantalla
             n.rectTransform.sizeDelta = new Vector2(120, 30);
         }
 
+        UIFabrica.Relleno(columna);
         RectTransform filaAyuda = UIFabrica.Fila(columna, "Ayuda", 56);
         Image fondoAyuda = UIFabrica.Caja(filaAyuda, "Fondo", new Color(1, 1, 1, 0.75f));
         UIFabrica.Anclar(fondoAyuda.rectTransform, 0, 0, 1, 1);
@@ -73,7 +94,6 @@ public class PantallaCiudad : Pantalla
         Text ayuda = UIFabrica.Texto(fondoAyuda.transform, "Toca un edificio: si tiene \"?\", decide qué es; si ya tiene papel, ve allí.", 24, Paleta.Texto, TextAnchor.MiddleCenter);
         UIFabrica.Anclar(ayuda.rectTransform, 0.02f, 0, 0.98f, 1);
 
-        UIFabrica.Relleno(columna);
         RectTransform filaEstado = UIFabrica.Fila(columna, "Estado", 60);
         estado = UIFabrica.Texto(filaEstado, "", 32, Paleta.Texto, TextAnchor.MiddleCenter, FontStyle.Bold);
         UIFabrica.Anclar(estado.rectTransform, 0, 0, 1, 1);
@@ -90,6 +110,9 @@ public class PantallaCiudad : Pantalla
         hoja.gameObject.SetActive(false);
     }
 
+    public bool HojaAbierta { get { return hoja.gameObject.activeSelf; } }
+    public float AltoHoja { get { return hoja.sizeDelta.y; } }
+
     protected override void AlMostrar()
     {
         CerrarHoja();
@@ -101,7 +124,7 @@ public class PantallaCiudad : Pantalla
         nivel.text = "Nv. " + pr.Nivel;
         barraXp.fillAmount = pr.XpEnNivel / (float)Progreso.XpPorNivel;
         reloj.text = "Día " + juego.Dia + " · " + Jornada.Hora(juego.MinutoEntero);
-        monedas.text = pr.Datos.monedas + " monedas";
+        monedas.text = pr.Datos.monedas.ToString();
         foreach (Area area in Areas.Todas) rellenos[(int)area].fillAmount = juego.Jornada.Estado[area] / 100f;
         if (juego.Ciudad.Caminando) estado.text = "Caminando...";
         else if (!hoja.gameObject.activeSelf) estado.text = "";
@@ -119,6 +142,7 @@ public class PantallaCiudad : Pantalla
 
     private void LimpiarHoja(float alto)
     {
+        juego.Ciudad.SalirConstruir();
         hoja.sizeDelta = new Vector2(0, alto);
         for (int i = contenidoHoja.childCount - 1; i >= 0; i--) Object.Destroy(contenidoHoja.GetChild(i).gameObject);
         hoja.gameObject.SetActive(true);
@@ -128,6 +152,7 @@ public class PantallaCiudad : Pantalla
     public void CerrarHoja()
     {
         hoja.gameObject.SetActive(false);
+        if (juego.Ciudad != null) juego.Ciudad.SalirConstruir();
         juego.Ciudad.Activa = true;
     }
 
@@ -144,19 +169,32 @@ public class PantallaCiudad : Pantalla
 
     private void AbrirConstruir()
     {
-        LimpiarHoja(720);
+        LimpiarHoja(850);
+        juego.Ciudad.ModoConstruir(edificioElegido);
+        int manzanas = Ciudad3D.Manzanas(edificioElegido);
         Titulo("Modo construir: ¿qué es este edificio?");
+        Text dist = UIFabrica.Texto(UIFabrica.Fila(contenidoHoja, "Distancia", 40),
+            manzanas == 0 ? "Es tu casa." : "A " + manzanas + (manzanas == 1 ? " manzana" : " manzanas") + " de casa (unos " + manzanas * 2 + " min andando). Lo cercano se usa más.",
+            26, Paleta.TextoSuave, TextAnchor.MiddleLeft);
+        UIFabrica.Anclar(dist.rectTransform, 0, 0, 1, 1);
         RolEdificio[] roles = Catalogos.Roles;
         for (int f = 0; f < 4; f++)
         {
-            RectTransform fila = UIFabrica.Fila(contenidoHoja, "Roles " + f, 100);
+            RectTransform fila = UIFabrica.Fila(contenidoHoja, "Roles " + f, 104);
             for (int c = 0; c < 2; c++)
             {
                 int i = f * 2 + c;
                 if (i >= roles.Length) break;
                 RolEdificio rol = roles[i];
-                Button b = Boton(fila, rol.nombre, Color.Lerp(Paleta.DeArea(rol.area), Color.white, 0.45f), Paleta.Texto, () => AsignarRol(rol.id));
+                bool actual = juego.Datos.ciudad.roles[edificioElegido] == rol.id;
+                Button b = Boton(fila, rol.nombre, actual ? Color.Lerp(Paleta.DeArea(rol.area), Color.white, 0.55f) : Paleta.Tarjeta, Paleta.Texto, () => AsignarRol(rol.id));
                 UIFabrica.Anclar((RectTransform)b.transform, c * 0.5f + 0.01f, 0, (c + 1) * 0.5f - 0.01f, 1);
+                Text t = b.GetComponentInChildren<Text>();
+                t.alignment = TextAnchor.MiddleLeft;
+                UIFabrica.Anclar(t.rectTransform, 0.3f, 0, 0.97f, 1);
+                FormasUI ic = Iconos.Crear(b.transform, rol.area, 64f);
+                ic.rectTransform.anchorMin = ic.rectTransform.anchorMax = new Vector2(0, 0.5f);
+                ic.rectTransform.anchoredPosition = new Vector2(56, 0);
             }
         }
         RectTransform pie = UIFabrica.Fila(contenidoHoja, "Pie", 100);

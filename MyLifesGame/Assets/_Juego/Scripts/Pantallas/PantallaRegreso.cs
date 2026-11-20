@@ -75,7 +75,7 @@ public class PantallaRegreso : Pantalla
         for (int i = 0; i < 6; i++)
         {
             botones[i].image.color = elegidas[i] ? Paleta.Hex("E4F2E1") : Paleta.Tarjeta;
-            marcas[i].text = elegidas[i] ? "✓" : "";
+            marcas[i].text = elegidas[i] ? "Sí" : "";
             duraciones[i].text = Jornada.Duracion(minutos[i]);
         }
     }

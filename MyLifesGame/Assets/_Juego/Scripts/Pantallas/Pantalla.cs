@@ -32,6 +32,7 @@ public abstract class Pantalla
             columna.offsetMin = new Vector2(0, AltoBarra);
             BarraNavegacion.Crear(fondo.transform, juego, pestana);
         }
+        columna.gameObject.AddComponent<ZonaSegura>();
     }
 
     public void Mostrar() { raiz.SetActive(true); aparecer.Lanzar(); AlMostrar(); }

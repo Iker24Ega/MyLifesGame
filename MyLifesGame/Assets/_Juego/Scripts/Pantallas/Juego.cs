@@ -209,8 +209,14 @@ public class Juego : MonoBehaviour
         if (AccionEnCurso == null) Jornada.Avanzar(MinutoEntero);
         if (actual != null) actual.Actualizar();
 
-        if (aviso != null && aviso.transform.parent.gameObject.activeSelf && Time.unscaledTime > finAviso)
-            aviso.transform.parent.gameObject.SetActive(false);
+        if (aviso != null && aviso.transform.parent.gameObject.activeSelf)
+        {
+            if (Time.unscaledTime > finAviso) aviso.transform.parent.gameObject.SetActive(false);
+            // Con la hoja de la ciudad abierta, el aviso sube por encima de ella para no taparla
+            var rtAviso = (RectTransform)aviso.transform.parent;
+            bool hojaAbierta = actual == pCiudad && pCiudad.HojaAbierta;
+            rtAviso.anchoredPosition = new Vector2(0, hojaAbierta ? pCiudad.AltoHoja + Pantalla.AltoBarra + 30 : Pantalla.AltoBarra + 40);
+        }
 
         if (Time.unscaledTime > proximoGuardado)
         {
@@ -239,7 +245,7 @@ public class Juego : MonoBehaviour
     {
         var sb = new StringBuilder("[Diario] Día ");
         sb.Append(e.minutoInicio / 1440 + 1).Append(' ').Append(Jornada.Hora(e.minutoInicio)).Append(" | ").Append(e.texto);
-        if (!string.IsNullOrEmpty(e.nota)) sb.Append(" → ").Append(e.nota);
+        if (!string.IsNullOrEmpty(e.nota)) sb.Append(": ").Append(e.nota);
         sb.Append(" | F ").Append(Mathf.RoundToInt(e.valores[0]))
           .Append(" M ").Append(Mathf.RoundToInt(e.valores[1]))
           .Append(" S ").Append(Mathf.RoundToInt(e.valores[2]))
@@ -393,7 +399,7 @@ public class Juego : MonoBehaviour
         Datos.ciudad.roles[edificio] = rol;
         Ciudad.ActualizarEdificio(edificio);
         RolEdificio r = Catalogos.BuscarRol(rol);
-        Debug.Log("[Diario] Edificio " + edificio + " → " + (r != null ? r.nombre : "sin papel"));
+        Debug.Log("[Diario] Edificio " + edificio + ": " + (r != null ? r.nombre : "sin papel"));
         var mensajes = new List<string>();
         if (Ciudad.RolesAsignados() >= 4) Progreso.Desbloquear("constructor", mensajes);
         AvisarTodos(mensajes);

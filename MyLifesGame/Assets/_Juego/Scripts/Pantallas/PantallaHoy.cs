@@ -174,7 +174,7 @@ public class PantallaHoy : Pantalla
         {
             Evento e = dia.Eventos[i];
             reg.Append(Jornada.Hora(e.minutoInicio)).Append("  ").Append(e.texto);
-            if (!string.IsNullOrEmpty(e.nota)) reg.Append(" → ").Append(e.nota);
+            if (!string.IsNullOrEmpty(e.nota)) reg.Append(": ").Append(e.nota);
             reg.Append('\n');
         }
         registro.text = reg.ToString();

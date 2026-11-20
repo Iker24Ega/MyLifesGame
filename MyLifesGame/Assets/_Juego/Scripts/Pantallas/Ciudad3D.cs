@@ -37,6 +37,14 @@ public class Ciudad3D : MonoBehaviour
     private Camera camara;
     private Transform avatar;
     private Avatar3D avatar3D;
+    private Transform anilloAvatar;
+    private RectTransform burbuja;
+    private FormasUI dibujoEstado;
+    private Text textoEstado;
+    private TipoEstadoAvatar estadoDibujado = (TipoEstadoAvatar)(-1);
+    private float proximaHuella;
+    private bool huellaIzquierda;
+    private readonly List<KeyValuePair<Transform, float>> huellas = new List<KeyValuePair<Transform, float>>();
     private float zoom = 1f;
     private Vector3 desplazamiento;          // arrastre de la cámara
     private Vector2 inicioPuntero;
@@ -388,8 +396,30 @@ public class Ciudad3D : MonoBehaviour
     {
         avatar3D = Avatar3D.Crear(transform);
         avatar = avatar3D.transform;
-        Pieza(PrimitiveType.Cylinder, "Anillo", new Vector3(0, 0.02f, 0), new Vector3(2.6f, 0.008f, 2.6f), Paleta.Hex("FFFDF8"), avatar);
+        anilloAvatar = Pieza(PrimitiveType.Cylinder, "Anillo", new Vector3(0, 0.02f, 0), new Vector3(2.6f, 0.008f, 2.6f), Paleta.Hex("FFFDF8"), avatar).transform;
+        Pieza(PrimitiveType.Cylinder, "Centro anillo", new Vector3(0, 0.03f, 0), new Vector3(2.2f, 0.008f, 2.2f), Paleta.Hex("F7D9A8"), avatar);
         avatar.rotation = Quaternion.Euler(0, 180, 0);
+        CrearBurbujaEstado();
+    }
+
+    private void CrearBurbujaEstado()
+    {
+        var go = new GameObject("Burbuja estado", typeof(RectTransform), typeof(Canvas));
+        go.transform.SetParent(transform, false);
+        go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+        burbuja = (RectTransform)go.transform;
+        burbuja.sizeDelta = new Vector2(220, 220);
+        burbuja.localScale = Vector3.one * 0.008f;
+        Image fondo = UIFabrica.Caja(go.transform, "Fondo", Paleta.Blanco);
+        fondo.sprite = UIFabrica.Circulo; fondo.type = Image.Type.Simple;
+        UIFabrica.Anclar(fondo.rectTransform, 0, 0, 1, 1);
+        UIFabrica.Sombra(fondo, 6f, 0.2f);
+        RectTransform zd = UIFabrica.Crear("Dibujo", fondo.transform);
+        UIFabrica.Anclar(zd, 0.15f, 0.15f, 0.85f, 0.85f);
+        dibujoEstado = FormasUI.En(zd.gameObject);
+        textoEstado = UIFabrica.Texto(fondo.transform, "", 110, Paleta.TextoSuave, TextAnchor.MiddleCenter, FontStyle.Bold);
+        UIFabrica.Anclar(textoEstado.rectTransform, 0, 0, 1, 1);
+        carteles.Add(burbuja);
     }
 
     public void PonerRopa(string colorHex) { if (avatar3D != null) avatar3D.PonerRopa(colorHex); }
@@ -520,10 +550,118 @@ public class Ciudad3D : MonoBehaviour
         if (camara == null) return;
         foreach (Transform c in carteles) c.rotation = camara.transform.rotation;
         float tiempo = Time.time;
+        AnimarAvatarEnCiudad(tiempo);
+        Update2Construir();
         for (int i = 0; i < solares.Count; i++)
         {
             Solar s = solares[i];
             s.medallon.transform.localPosition = s.centro + new Vector3(0, s.alto + 2.4f + Mathf.Sin(tiempo * 2f + i) * 0.18f, 0);
         }
+    }
+
+    // ---------------------------------------------------------------- vida alrededor del avatar
+
+    private void AnimarAvatarEnCiudad(float tiempo)
+    {
+        if (avatar == null) return;
+        // Anillo que late suavemente bajo el avatar
+        float k = 1f + Mathf.Sin(tiempo * 3f) * 0.06f;
+        anilloAvatar.localScale = new Vector3(2.6f * k, 0.008f, 2.6f * k);
+
+        // Burbuja de estado sobre la cabeza
+        TipoEstadoAvatar e = avatar3D.Estado;
+        bool mostrar = e != TipoEstadoAvatar.Normal && !Caminando;
+        burbuja.gameObject.SetActive(mostrar);
+        if (mostrar)
+        {
+            burbuja.position = avatar.position + new Vector3(1.1f, 4.6f + Mathf.Sin(tiempo * 2.4f) * 0.12f, 0);
+            if (e != estadoDibujado)
+            {
+                estadoDibujado = e;
+                dibujoEstado.Limpiar();
+                textoEstado.text = "";
+                if (e == TipoEstadoAvatar.EnForma) Estrella(dibujoEstado, Paleta.Hex("F2B632"));
+                else if (e == TipoEstadoAvatar.Cansado) { textoEstado.text = "Zz"; textoEstado.color = Paleta.DeArea(Area.Mente); }
+                else { textoEstado.text = "..."; textoEstado.color = Paleta.TextoSuave; }
+            }
+        }
+
+        // Huellas al caminar, que se encogen y desaparecen
+        if (Caminando && tiempo >= proximaHuella)
+        {
+            proximaHuella = tiempo + 0.16f;
+            huellaIzquierda = !huellaIzquierda;
+            Vector3 lado = avatar.right * (huellaIzquierda ? -0.28f : 0.28f);
+            GameObject h = Pieza(PrimitiveType.Cylinder, "Huella", avatar.position + lado + new Vector3(0, 0.07f, 0), new Vector3(0.32f, 0.01f, 0.46f), Paleta.Hex("D8C3A5"));
+            h.transform.rotation = avatar.rotation;
+            huellas.Add(new KeyValuePair<Transform, float>(h.transform, tiempo));
+        }
+        for (int i = huellas.Count - 1; i >= 0; i--)
+        {
+            float edad = tiempo - huellas[i].Value;
+            Transform t = huellas[i].Key;
+            if (edad > 2.2f) { Destroy(t.gameObject); huellas.RemoveAt(i); continue; }
+            float f = 1f - Mathf.Clamp01((edad - 1.2f) / 1f);
+            t.localScale = new Vector3(0.32f * f, 0.01f, 0.46f * f);
+        }
+    }
+
+    private static void Estrella(FormasUI f, Color c)
+    {
+        var p = new Vector2[10];
+        for (int i = 0; i < 10; i++)
+        {
+            float a = i * 36f * Mathf.Deg2Rad;
+            float r = i % 2 == 0 ? 0.95f : 0.42f;
+            p[i] = new Vector2(Mathf.Sin(a), Mathf.Cos(a)) * r;
+        }
+        f.Poligono(p, c, Vector2.zero);
+    }
+
+    // ---------------------------------------------------------------- modo construir
+
+    private Transform guiasConstruir, marcaSolar;
+
+    /// <summary>Manzanas (a pie) entre casa y el solar indicado.</summary>
+    public static int Manzanas(int indice)
+    {
+        Vector3 d = Solares[indice] - Solares[IndiceCasa];
+        return Mathf.Max(0, Mathf.RoundToInt((Mathf.Abs(d.x) + Mathf.Abs(d.z)) / 14f));
+    }
+
+    /// <summary>Muestra los anillos de distancia desde casa y marca el solar elegido.</summary>
+    public void ModoConstruir(int indice)
+    {
+        SalirConstruir();
+        guiasConstruir = new GameObject("Guías construir").transform;
+        guiasConstruir.SetParent(transform, false);
+        Vector3 casa = Solares[IndiceCasa];
+        Color[] colores = { Paleta.Hex("FFFFFF"), Paleta.Hex("FFF1D6") };
+        for (int r = 1; r <= 2; r++)
+        {
+            float radio = 14f * r;
+            int n = 28 * r;
+            for (int i = 0; i < n; i++)
+            {
+                float a = i * Mathf.PI * 2f / n;
+                Vector3 p = casa + new Vector3(Mathf.Cos(a) * radio, 0.12f, Mathf.Sin(a) * radio);
+                Pieza(PrimitiveType.Cylinder, "Punto", p, new Vector3(0.55f, 0.01f, 0.55f), colores[r - 1], guiasConstruir);
+            }
+        }
+        marcaSolar = Pieza(PrimitiveType.Cylinder, "Marca solar", Solares[indice] + new Vector3(0, 0.1f, 0), new Vector3(11f, 0.01f, 11f), Paleta.Hex("F6B49F"), guiasConstruir).transform;
+    }
+
+    public void SalirConstruir()
+    {
+        if (guiasConstruir != null) Destroy(guiasConstruir.gameObject);
+        guiasConstruir = null;
+        marcaSolar = null;
+    }
+
+    private void Update2Construir()
+    {
+        if (marcaSolar == null) return;
+        float k = 1f + Mathf.Sin(Time.time * 4f) * 0.04f;
+        marcaSolar.localScale = new Vector3(11f * k, 0.01f, 11f * k);
     }
 }

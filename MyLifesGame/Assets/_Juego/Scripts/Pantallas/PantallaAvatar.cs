@@ -106,7 +106,7 @@ public class PantallaAvatar : Pantalla
         string causa;
         TipoEstadoAvatar tipo = EstadoAvatar.Calcular(juego.Jornada.Estado, juego.VieneDeAusencia, out causa);
         avatar.Actualizar(tipo, Catalogos.BuscarPrenda(pr.Datos.ropaPuesta).colorHex);
-        estado.text = "<color=#" + ColorUtility.ToHtmlStringRGB(ColorEstado(tipo)) + ">● " + EstadoAvatar.Nombre(tipo) + "</color>   <size=26><color=#8A7565>" + causa + "</color></size>";
+        estado.text = "<color=#" + ColorUtility.ToHtmlStringRGB(ColorEstado(tipo)) + ">" + EstadoAvatar.Nombre(tipo) + "</color>   <size=26><color=#8A7565>" + causa + "</color></size>";
 
         for (int i = 0; i < Catalogos.Prendas.Length && i < 6; i++)
         {
@@ -118,7 +118,7 @@ public class PantallaAvatar : Pantalla
             string corto = p.nombre.Replace("Sudadera ", "");
             textosPrenda[i].text = char.ToUpper(corto[0]) + corto.Substring(1);
             tarjetasPrenda[i].color = puesta ? Paleta.Hex("E4F2E1") : Paleta.Tarjeta;
-            string accion = puesta ? "Puesta ✓" : tiene ? "Poner" : alcanzable ? "● " + p.precio : "Nivel " + p.nivelMinimo;
+            string accion = puesta ? "Puesta" : tiene ? "Poner" : alcanzable ? p.precio + " monedas" : "Nivel " + p.nivelMinimo;
             UIFabrica.CambiarTexto(botonesPrenda[i], accion);
             botonesPrenda[i].image.color = puesta ? Paleta.Verde : tiene ? Paleta.DeArea(Area.Mente) : alcanzable ? Paleta.Hex("E3B341") : Paleta.Gris;
         }

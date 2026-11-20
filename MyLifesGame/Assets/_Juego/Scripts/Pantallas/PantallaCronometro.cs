@@ -69,7 +69,7 @@ public class PantallaCronometro : Pantalla
         {
             float v = a.efectoHora.Get(area);
             int i = (int)area;
-            flechas[i].text = v > 0.01f ? "▲ sube" : v < -0.01f ? "▼ baja" : "·";
+            flechas[i].text = v > 0.01f ? "+ sube" : v < -0.01f ? "− baja" : "·";
             flechas[i].color = v > 0.01f ? Paleta.Verde : v < -0.01f ? Paleta.Coral : Paleta.TextoSuave;
         }
     }

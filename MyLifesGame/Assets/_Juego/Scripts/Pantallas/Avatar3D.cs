@@ -103,6 +103,8 @@ public class Avatar3D : MonoBehaviour
 
     public void PonerEstado(TipoEstadoAvatar estado) { estadoAvatar = estado; }
 
+    public TipoEstadoAvatar Estado { get { return estadoAvatar; } }
+
     private void Update() { Animar(); }
 
     private void Animar()

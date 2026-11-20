@@ -45,7 +45,7 @@ public class AvatarDibujo
         ajuste.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
         ajuste.aspectRatio = 768f / 960f;
 
-        extra = UIFabrica.Texto(fondo.transform, "", 64, Paleta.TextoSuave, TextAnchor.UpperRight, FontStyle.Bold);
+        extra = UIFabrica.Texto(fondo.transform, "", 46, Paleta.TextoSuave, TextAnchor.UpperRight, FontStyle.Bold);
         UIFabrica.Anclar(extra.rectTransform, 0.6f, 0.62f, 0.94f, 0.95f);
     }
 
@@ -55,7 +55,7 @@ public class AvatarDibujo
         Color cielo;
         switch (estado)
         {
-            case TipoEstadoAvatar.EnForma: fondo.color = Paleta.Hex("FFEFD2"); cielo = Paleta.Hex("A9D8F2"); extra.text = "★"; extra.color = Paleta.Hex("E3B341"); break;
+            case TipoEstadoAvatar.EnForma: fondo.color = Paleta.Hex("FFEFD2"); cielo = Paleta.Hex("A9D8F2"); extra.text = "¡Genial!"; extra.color = Paleta.Hex("D9963B"); break;
             case TipoEstadoAvatar.Cansado: fondo.color = Paleta.Hex("EAE2D6"); cielo = Paleta.Hex("C9C2D8"); extra.text = "Zz"; extra.color = Paleta.TextoSuave; break;
             case TipoEstadoAvatar.Descuidado: fondo.color = Paleta.Hex("DDD6E4"); cielo = Paleta.Hex("8E94B5"); extra.text = "?"; extra.color = Paleta.TextoSuave; break;
             default: fondo.color = Paleta.Hex("F8EEDF"); cielo = Paleta.Hex("BFE0F2"); extra.text = ""; break;

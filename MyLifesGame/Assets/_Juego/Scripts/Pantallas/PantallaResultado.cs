@@ -136,7 +136,7 @@ public class PantallaResultado : Pantalla
         var sb = new StringBuilder();
         foreach (string nota in resultado.notas)
             if (nota != "Dosis óptima") sb.Append("• ").Append(nota).Append('\n');
-        foreach (string m in resultado.mensajes) sb.Append("<b>★ ").Append(m).Append("</b>\n");
+        foreach (string m in resultado.mensajes) sb.Append("<b>+ ").Append(m).Append("</b>\n");
         if (sb.Length == 0) sb.Append("• Sin efectos especiales esta vez.");
         notas.text = sb.ToString();
     }

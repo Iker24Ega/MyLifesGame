@@ -101,7 +101,7 @@ public class PantallaHacer : Pantalla
             float v = elegida.efectoHora.Get(area);
             if (Mathf.Abs(v) < 0.01f) continue;
             sb.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(Paleta.DeArea(area))).Append(">")
-              .Append(Areas.Nombre(area)).Append(v > 0 ? " ▲" : " ▼").Append("</color>   ");
+              .Append(Areas.Nombre(area)).Append(v > 0 ? " +" : " −").Append("</color>   ");
         }
         detalleImpacto.text = sb.ToString();
         bool amigos = elegida.socialConAmigosPorHora > 0;

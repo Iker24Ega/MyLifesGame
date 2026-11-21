@@ -175,7 +175,6 @@ public partial class Ciudad3D
 
     private void PlazaFuente()
     {
-        Losa("Plaza", new Vector3(0, 0.07f, 0), new Vector3(10f, 0.06f, 10f), texAdoquin, 2.2f);
         if (Sprite2D("fuente", transform, HaciaCamara * 3.0f + Vector3.up * 0.1f, 6.4f) != null)
         {
             for (int i = 0; i < 4; i++)
@@ -229,6 +228,13 @@ public partial class Ciudad3D
 
     private void Banco(Vector3 p, float giro)
     {
+        if (Modelos3D.Existe("banco"))
+        {
+            GameObject g = Modelos3D.Crear("banco", transform, 2.3f);
+            g.transform.localPosition = Curva(p);
+            g.transform.localRotation = Quaternion.Euler(0, giro, 0);
+            return;
+        }
         if (Sprite2D("banco", transform, Curva(p), 2.1f) != null) return;
         Transform b = new GameObject("Banco").transform;
         b.SetParent(transform, false);
@@ -293,6 +299,13 @@ public partial class Ciudad3D
 
     private void Arbusto(Vector3 p, int k)
     {
+        if (Modelos3D.Existe("arbusto_flores"))
+        {
+            GameObject g = Modelos3D.Crear("arbusto_flores", transform, 1.5f + (k % 3) * 0.25f, Modelos3D.Medida.Alto);
+            g.transform.localPosition = Curva(p);
+            g.transform.localRotation = Quaternion.Euler(0, k * 53f, 0);
+            return;
+        }
         if (Sprite2D(k % 3 == 0 && Resources.Load<Texture2D>("Sprites/macizo_flores") != null ? "macizo_flores" : "arbusto_flores", transform, Curva(p), 1.7f) != null) return;
         Transform t = new GameObject("Arbusto").transform;
         t.SetParent(transform, false);

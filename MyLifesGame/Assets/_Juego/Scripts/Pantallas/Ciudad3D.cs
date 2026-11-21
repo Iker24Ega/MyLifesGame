@@ -16,12 +16,9 @@ using UnityEngine.UI;
 /// </summary>
 public partial class Ciudad3D : MonoBehaviour
 {
-    public static readonly Vector3[] Solares =
-    {
-        new Vector3(-Paso, 0, -Paso), new Vector3(0, 0, -Paso), new Vector3(Paso, 0, -Paso),
-        new Vector3(-Paso, 0, 0), new Vector3(Paso, 0, 0),
-        new Vector3(-Paso, 0, Paso), new Vector3(0, 0, Paso), new Vector3(Paso, 0, Paso),
-    };
+    private static Vector3[] solaresPlano;
+    /// <summary>Solares jugables del pueblo diseñado a mano (ver Ciudad3DMapa).</summary>
+    public static Vector3[] Solares { get { return solaresPlano ?? (solaresPlano = SolaresDelPlano()); } }
     /// <summary>Distancia entre centros de manzana (deja aceras anchas para árboles y farolas).</summary>
     public const float Paso = 21f;
     /// <summary>Vista isométrica: la cámara mira la ciudad en diagonal, como en la imagen de referencia.</summary>
@@ -89,12 +86,11 @@ public partial class Ciudad3D : MonoBehaviour
 
         PrepararCamaraYLuz();
 
-        SueloYCalles();
-        PlazaFuente();
+        ConstruirMapa();
 
         for (int i = 0; i < Solares.Length; i++)
         {
-            var s = new Solar { centro = Curva(Solares[i]), puertaLogica = Solares[i] + (HaySprites ? HaciaCamara * (AnchoSolar * 0.78f + 1.2f) : new Vector3(0, 0, -5.6f)), giro = GiroSolar(i) };
+            var s = new Solar { centro = Solares[i], puertaLogica = PuertaDelPlano(i), giro = 0f };
             s.raiz = new GameObject("Solar " + i).transform;
             s.raiz.SetParent(transform, false);
             s.raiz.gameObject.AddComponent<Lote>().indice = i;
@@ -105,8 +101,6 @@ public partial class Ciudad3D : MonoBehaviour
             solares.Add(s);
         }
 
-        Barrio();
-        Ambiente();
         BarriosBloqueados();
         CrearAvatar();
         avatar.position = solares[datos.edificioActual].Puerta;
@@ -596,28 +590,9 @@ public partial class Ciudad3D : MonoBehaviour
         Caminando = true; avatar3D.Caminando = true;
         textoCamino.text = CaminoA(datos.roles[indice]);
         rotuloCamino.gameObject.SetActive(true);
-        Vector3 inicio = solares[Mathf.Clamp(datos.edificioActual, 0, solares.Count - 1)].puertaLogica;
-        Vector3 destino = solares[indice].puertaLogica;
-        float calleInicio = MasCercana(inicio.z);
-        float calleDestino = MasCercana(destino.z);
-        float calleVertical = MasCercana(inicio.x);
-        var claves = new List<Vector3>
-        {
-            inicio,
-            new Vector3(inicio.x, 0, calleInicio),
-            new Vector3(calleVertical, 0, calleInicio),
-            new Vector3(calleVertical, 0, calleDestino),
-            new Vector3(destino.x, 0, calleDestino),
-            destino,
-        };
-        // Las calles son curvas: se recorre la ruta de la cuadrícula a pasos cortos, deformando cada punto
-        var puntos = new List<Vector3>();
-        for (int i = 1; i < claves.Count; i++)
-        {
-            float largo = Vector3.Distance(claves[i - 1], claves[i]);
-            int n = Mathf.Max(1, Mathf.CeilToInt(largo / 1.5f));
-            for (int j = 1; j <= n; j++) puntos.Add(Curva(Vector3.Lerp(claves[i - 1], claves[i], j / (float)n)));
-        }
+        Vector3 inicio = solares[Mathf.Clamp(datos.edificioActual, 0, solares.Count - 1)].Puerta;
+        Vector3 destino = solares[indice].Puerta;
+        List<Vector3> puntos = Ruta(inicio, destino);   // por las calles del pueblo, con curvas
         foreach (Vector3 p in puntos)
         {
             while ((avatar.position - p).sqrMagnitude > 0.01f)
@@ -647,10 +622,7 @@ public partial class Ciudad3D : MonoBehaviour
     /// </summary>
     public static Vector3 Curva(Vector3 p)
     {
-        const float A = 2.4f;
-        float dx = A * Mathf.Sin(p.z * 0.085f) + 0.9f * Mathf.Sin(p.z * 0.21f + p.x * 0.05f) - 0.9f * Mathf.Sin(p.x * 0.05f);
-        float dz = A * Mathf.Sin(p.x * 0.075f) + 0.8f * Mathf.Sin(p.x * 0.19f + p.z * 0.04f) - 0.8f * Mathf.Sin(p.z * 0.04f);
-        return new Vector3(p.x + dx, p.y, p.z + dz);
+        return p; // el pueblo ya está diseñado a mano: no hace falta deformar nada
     }
 
     /// <summary>Giro de cada manzana (las parcelas no están todas rectas).</summary>
@@ -811,8 +783,8 @@ public partial class Ciudad3D : MonoBehaviour
             {
                 float f = 0.07f * zoom;
                 desplazamiento += Quaternion.Euler(0, GiroCamara, 0) * new Vector3(-delta.x * f, 0, -delta.y * f);
-                desplazamiento.x = Mathf.Clamp(desplazamiento.x, -Paso * 2f, Paso * 2f);
-                desplazamiento.z = Mathf.Clamp(desplazamiento.z, -Paso * 2.2f, Paso * 2.2f);
+                desplazamiento.x = Mathf.Clamp(desplazamiento.x, -60f, 60f);
+                desplazamiento.z = Mathf.Clamp(desplazamiento.z, -60f, 60f);
             }
         }
         if (pulsado && puntero.press.wasReleasedThisFrame)
@@ -997,7 +969,8 @@ public partial class Ciudad3D : MonoBehaviour
 
     // ---------------------------------------------------------------- barrios bloqueados
 
-    private static readonly Vector3[] CentrosBarrio = { new Vector3(58f, 0, 0), new Vector3(-58f, 0, 0), new Vector3(0, 0, 58f) };
+    // Barrios por desbloquear, fuera del pueblo (equivalen a W(-70,10), W(66,-34) y W(10,62))
+    private static readonly Vector3[] CentrosBarrio = { new Vector3(-42.4f, 0, 56.6f), new Vector3(22.6f, 0, -70.7f), new Vector3(50.9f, 0, 36.8f) };
     public static readonly int[] NivelBarrio = { 3, 5, 8 };
     private readonly List<Text> textosBarrio = new List<Text>();
 

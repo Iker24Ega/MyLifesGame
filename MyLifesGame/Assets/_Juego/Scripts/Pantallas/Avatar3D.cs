@@ -13,6 +13,8 @@ using UnityEngine.Playables;
 public class Avatar3D : MonoBehaviour
 {
     public bool Caminando;
+    /// <summary>Trayectos largos: corre en lugar de andar (la ciudad ajusta la velocidad para que no patine).</summary>
+    public bool Corriendo;
     /// <summary>Acción que está haciendo (id de la tabla: entrenar, estudiar, quedar...). Vacío: ninguna.</summary>
     public string Accion = "";
 
@@ -40,7 +42,7 @@ public class Avatar3D : MonoBehaviour
     private Transform cabeza, cuello, pecho, cadera, brazoI, brazoD, codoI, codoD, munecaI, munecaD, musloI, musloD, rodillaI, rodillaD, pieI, pieD;
     private float escala = 1f, alturaTobillo;
     private readonly List<Material> sudadera = new List<Material>();
-    private Transform mochila, pesaI, pesaD, libro, mando, asiento;
+    private Transform mochila, pesaI, pesaD, libro, mando, asiento, botella;
     private TipoEstadoAvatar estadoAvatar = TipoEstadoAvatar.Normal;
     private static readonly Dictionary<Color, Material> materiales = new Dictionary<Color, Material>();
 
@@ -242,7 +244,7 @@ public class Avatar3D : MonoBehaviour
     // Nombres de animación de Quaternius → Mixamo (el personaje generado usa las de Mixamo)
     private static readonly Dictionary<string, string[]> Alias = new Dictionary<string, string[]>
     {
-        { "Walk", new[] { "Walking" } }, { "Idle_Neutral", new[] { "Idle" } },
+        { "Walk", new[] { "Walking (1)", "Walking" } }, { "Correr", new[] { "Jogging" } }, { "Idle_Neutral", new[] { "Idle" } },
         { "Curl", new[] { "Bicep Curl", "BicepCurl" } }, { "Sentado", new[] { "Sitting Idle", "Sitting" } },
         { "Teclear", new[] { "Typing" } }, { "Estirar", new[] { "Neck Stretching", "Stretching" } },
         { "Celebrar", new[] { "Cheering" } }, { "Saludar", new[] { "Waving", "Wave" } },
@@ -349,6 +351,10 @@ public class Avatar3D : MonoBehaviour
     private void CrearAccesorios()
     {
         float h = Altura;
+        botella = Grupo("Botella");
+        Pieza(PrimitiveType.Cylinder, "Cuerpo", Vector3.zero, new Vector3(0.05f, 0.07f, 0.05f) * h, Paleta.Hex("9FC3D6"), botella);
+        Pieza(PrimitiveType.Cylinder, "Tapón", new Vector3(0, 0.08f * h, 0), new Vector3(0.035f, 0.015f, 0.035f) * h, Paleta.Blanco, botella);
+        botella.gameObject.SetActive(false);
         mochila = Grupo("Mochila");
         Color gris = Paleta.Mochila, grisOscuro = Paleta.Hex("3A3E45");
         Pieza(PrimitiveType.Cube, "Cuerpo", Vector3.zero, new Vector3(0.29f, 0.32f, 0.13f) * h, gris, mochila);
@@ -397,7 +403,7 @@ public class Avatar3D : MonoBehaviour
     {
         accionMostrada = a;
         pesaI.gameObject.SetActive(a == "entrenar"); pesaD.gameObject.SetActive(a == "entrenar");
-        libro.gameObject.SetActive(a == "estudiar" || a == "trabajar");
+        libro.gameObject.SetActive(a == "estudiar" || (a == "trabajar" && !Generado));
         mando.gameObject.SetActive(a == "videojuegos");
         asiento.gameObject.SetActive(EsSentado(a));
     }
@@ -565,7 +571,8 @@ public class Avatar3D : MonoBehaviour
         string a = Caminando ? "" : (Accion ?? "");
         if (a != accionMostrada) MostrarAccesorios(a);
 
-        if (Caminando) Reproducir("Walk", 0.2f, Generado ? 1f : 1.15f);
+        if (Generado && !Caminando && Rutina(a)) { }
+        else if (Caminando) Reproducir(Corriendo && Tiene("Correr") ? "Correr" : "Walk", 0.2f, Generado ? 1f : 1.15f);
         else if (a == "pasear") Reproducir("Walk", 0.25f, 0.9f);
         else if (Generado && a == "entrenar" && Tiene("Curl")) Reproducir("Curl", 0.3f);
         else if (Generado && a == "celebrar" && Tiene("Celebrar")) Reproducir("Celebrar", 0.3f);
@@ -583,6 +590,83 @@ public class Avatar3D : MonoBehaviour
             AplicarPesos();
         }
     }
+
+    // ---------------------------------------------------------------- rutinas (más vida durante las acciones)
+
+    private struct Paso
+    {
+        public string clip; public float dur;
+        public Paso(string clip, float dur) { this.clip = clip; this.dur = dur; }
+    }
+
+    /// <summary>
+    /// Secuencias de animaciones de Mixamo por acción. dur = segundos (0 = lo que dure la animación una vez).
+    /// Al acabar, vuelve al paso indicado en <see cref="RepetirDesde"/> (o se queda en el último).
+    /// </summary>
+    private static readonly Dictionary<string, Paso[]> Rutinas = new Dictionary<string, Paso[]>
+    {
+        { "entrenar", new[] { new Paso("Picking Up", 0), new Paso("Bicep Curl", 9), new Paso("Drinking", 0), new Paso("Bicep Curl", 9),
+                              new Paso("Wiping Sweat", 0), new Paso("Push Up", 7), new Paso("Air Squat", 7), new Paso("Drinking", 0) } },
+        { "celebrar", new[] { new Paso("Breathing Idle", 2.4f), new Paso("Victory", 0), new Paso("Cheering", 4.5f), new Paso("Idle", 9999) } },
+        { "estirarse", new[] { new Paso("Sleeping Idle", 1.6f), new Paso("Waking", 0), new Paso("Arm Stretching", 0), new Paso("Idle", 9999) } },
+        { "quedar", new[] { new Paso("Stand To Sit", 0), new Paso("Sitting Talking", 9999) } },
+        { "trabajar", new[] { new Paso("Stand To Sit", 0), new Paso("Typing", 9999) } },
+        { "estudiar", new[] { new Paso("Stand To Sit", 0), new Paso("Sitting Idle", 9999) } },
+        { "descansar", new[] { new Paso("Stand To Sit", 0), new Paso("Sitting Idle", 9999) } },
+        { "videojuegos", new[] { new Paso("Stand To Sit", 0), new Paso("Sitting Idle", 9999) } },
+    };
+    private static readonly Dictionary<string, int> RepetirDesde = new Dictionary<string, int> { { "entrenar", 1 } };
+
+    private string rutinaActual;
+    private int pasoRutina;
+    private float tiempoPaso;
+
+    /// <summary>Avanza la rutina de la acción. Devuelve false si no hay rutina (o faltan sus animaciones).</summary>
+    private bool Rutina(string a)
+    {
+        Paso[] pasos;
+        if (string.IsNullOrEmpty(a) || !Rutinas.TryGetValue(a, out pasos)) { rutinaActual = null; return false; }
+        if (a != rutinaActual) { rutinaActual = a; pasoRutina = -1; tiempoPaso = 0f; Siguiente(pasos); }
+        if (pasoRutina < 0) return false;
+        tiempoPaso += Time.deltaTime;
+        Paso p = pasos[pasoRutina];
+        float dur = p.dur > 0 ? p.dur : DuracionClip(p.clip);
+        if (tiempoPaso >= dur) Siguiente(pasos);
+        return pasoRutina >= 0;
+    }
+
+    private void Siguiente(Paso[] pasos)
+    {
+        int inicio = pasoRutina;
+        for (int intento = 0; intento < pasos.Length; intento++)
+        {
+            int n = pasoRutina + 1;
+            if (n >= pasos.Length)
+            {
+                int desde;
+                if (!RepetirDesde.TryGetValue(rutinaActual, out desde)) return; // se queda en el último paso
+                n = desde;
+            }
+            pasoRutina = n;
+            if (Buscar(pasos[n].clip) != null)
+            {
+                tiempoPaso = 0f;
+                Reproducir(pasos[n].clip, 0.35f);
+                return;
+            }
+        }
+        if (inicio < 0) pasoRutina = -1; // ninguna animación disponible
+    }
+
+    private float DuracionClip(string nombre)
+    {
+        string real = Buscar(nombre);
+        AnimationClip c;
+        return real != null && clips.TryGetValue(real, out c) ? Mathf.Max(0.5f, c.length - 0.2f) : 1f;
+    }
+
+    /// <summary>Animación que suena ahora (para colocar pesas, botella...).</summary>
+    public string ClipActual { get { return clipActual; } }
 
     /// <summary>Gira un hueso en el espacio del avatar (eje dado en coordenadas del avatar), encima de la animación.</summary>
     private void Girar(Transform hueso, Vector3 ejeLocal, float grados)
@@ -663,6 +747,7 @@ public class Avatar3D : MonoBehaviour
                 Girar(pecho, X, -12f + Mathf.Sin(t * 1.2f) * 1.5f);
                 Girar(cabeza, X, 8f);
             }
+            else if (a == "quedar" && Generado) { } // "Sitting Talking" ya mueve brazos y cabeza
             else if (a == "quedar")
             {
                 Girar(brazoD, X, -60f); Girar(brazoD, Z, 40f + Mathf.Sin(t * 6f) * 15f); Girar(codoD, X, -40f);
@@ -682,6 +767,17 @@ public class Avatar3D : MonoBehaviour
         }
         SeguirPies();
         ColocarAccesorios(a);
+        if (Generado && a == "entrenar") AccesoriosRutina();
+    }
+
+    /// <summary>En el gimnasio: pesas solo al hacer curl (y al cogerlas del suelo), botella al beber.</summary>
+    private void AccesoriosRutina()
+    {
+        bool pesas = clipActual == "Bicep Curl" || (clipActual == "Picking Up" && tiempoPaso > DuracionClip("Picking Up") * 0.55f);
+        pesaI.gameObject.SetActive(pesas); pesaD.gameObject.SetActive(pesas);
+        bool bebe = clipActual == "Drinking";
+        botella.gameObject.SetActive(bebe);
+        if (bebe && munecaD != null) botella.localPosition = Local(munecaD) + new Vector3(0, 0.02f * Altura, 0.02f * Altura);
     }
 
     private void EscalarExtremidades(float piernas, float brazos)

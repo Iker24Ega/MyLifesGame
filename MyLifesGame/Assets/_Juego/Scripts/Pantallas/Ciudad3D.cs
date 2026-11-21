@@ -599,12 +599,19 @@ public partial class Ciudad3D : MonoBehaviour
         Vector3 inicio = solares[Mathf.Clamp(datos.edificioActual, 0, solares.Count - 1)].Puerta;
         Vector3 destino = solares[indice].Puerta;
         List<Vector3> puntos = Ruta(inicio, destino);   // por las calles del pueblo, con curvas
+        // Velocidad acorde a la animación (si no, patina): andando ~0,75 alturas/s; en trayectos largos, corriendo
+        float largo = 0f;
+        for (int i = 1; i < puntos.Count; i++) largo += Vector3.Distance(puntos[i - 1], puntos[i]);
+        bool correr = largo > 30f;
+        avatar3D.Corriendo = correr;
+        float alturaAvatar = Avatar3D.Altura * EscalaAvatar;
+        float velocidad = alturaAvatar * (correr ? 1.55f : 0.78f);
         foreach (Vector3 p in puntos)
         {
             while ((avatar.position - p).sqrMagnitude > 0.01f)
             {
                 Vector3 dir = p - avatar.position;
-                avatar.position = Vector3.MoveTowards(avatar.position, p, 10.5f * Time.deltaTime);
+                avatar.position = Vector3.MoveTowards(avatar.position, p, velocidad * Time.deltaTime);
                 if (dir.sqrMagnitude > 0.001f)
                     avatar.rotation = Quaternion.Slerp(avatar.rotation, Quaternion.LookRotation(new Vector3(dir.x, 0, dir.z)), 12f * Time.deltaTime);
                 yield return null;

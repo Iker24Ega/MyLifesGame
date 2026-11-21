@@ -128,6 +128,10 @@ public static class EstudioAvatar
             Texture2D fondo = Resources.Load<Texture2D>("Sprites/sala_" + sala);
             if (fondo != null) FondoSala(cont, fondo);   // la sala tal cual la imagen de Flow
             else Salas3D.Construir(cont, sala, accion);
+            // En el dormitorio, el avatar empieza tumbado en la cama (dormido) y se levanta
+            Transform cama = null;
+            foreach (Transform t in cont.GetComponentsInChildren<Transform>(true)) if (t.name == "bedSingle") cama = t;
+            avatar.Cama = cama;
             foreach (Transform t in cont.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = CapaEscena;
             salaActual = sala; accionSala = accion;
         }
@@ -182,6 +186,15 @@ public static class EstudioAvatar
         sombra.transform.localScale = new Vector3(1.9f, 0.005f, 1.9f);
         if (matSombra == null) matSombra = new Material(Shader.Find("Sprites/Default")) { color = new Color(0.35f, 0.22f, 0.12f, 0.28f) };
         sombra.GetComponent<Renderer>().sharedMaterial = matSombra;
+    }
+
+    /// <summary>Encuadre a medida de la cámara de escena (mirando a un punto de la sala, a una distancia).</summary>
+    public static void EncuadrarEscena(Vector3 objetivoLocal, float distancia, float altura = 8.2f)
+    {
+        if (camEscena == null) return;
+        Vector3 objetivo = Lugar + objetivoLocal;
+        camEscena.transform.position = objetivo + new Vector3(8.5f, altura, 15.5f).normalized * 19f * distancia;
+        camEscena.transform.LookAt(objetivo);
     }
 
     public static void QuitarEscena()

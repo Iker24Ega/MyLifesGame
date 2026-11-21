@@ -25,6 +25,8 @@ public class Avatar3D : MonoBehaviour
     private float EscalaBrazos = 0.9f;
     /// <summary>true si usa el personaje generado (Flow → TRELLIS → Mixamo) en lugar del de Quaternius.</summary>
     public bool Generado { get; private set; }
+    /// <summary>Cama donde está tumbado mientras duerme o se despierta (check-in de la mañana). Null: ninguna.</summary>
+    public Transform Cama;
     public Transform Cabeza { get { return cabeza; } }
     /// <summary>true si el último avatar creado usa el personaje generado (para encuadrar los retratos).</summary>
     public static bool UsaGenerado { get; private set; }
@@ -684,6 +686,8 @@ public class Avatar3D : MonoBehaviour
         if (Generado && calibrado < 3) Calibrar();
 
         modelo.localPosition = new Vector3(0, caida, 0);
+        modelo.localRotation = Quaternion.identity;
+        if (Generado && Cama != null && (clipActual == "Sleeping Idle" || clipActual == "Waking")) TumbarEnCama();
         EscalarExtremidades(1f, 1f);
         GuardarPies();
         EscalarExtremidades(EscalaPiernas, EscalaBrazos);
@@ -769,6 +773,37 @@ public class Avatar3D : MonoBehaviour
         ColocarAccesorios(a);
         if (Generado && a == "entrenar") AccesoriosRutina();
     }
+
+    /// <summary>
+    /// Coloca el modelo sobre el colchón, a lo largo de la cama (la animación ya lo pone tumbado).
+    /// El eje largo de la cama se calcula con sus límites.
+    /// </summary>
+    private void TumbarEnCama()
+    {
+        Renderer[] rs = Cama.GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return;
+        Bounds b = rs[0].bounds;
+        foreach (Renderer r in rs) b.Encapsulate(r.bounds);
+        // La cama de Kenney es pequeña para el avatar: se agranda (una vez) hasta que quepa tumbado
+        float alturaMundo = Altura * transform.lossyScale.y;
+        float largoCama = Mathf.Max(b.size.x, b.size.z);
+        if (largoCama < alturaMundo * 1.12f && largoCama > 0.001f)
+        {
+            Cama.localScale *= alturaMundo * 1.18f / largoCama;
+            return; // los bounds se recalculan el siguiente fotograma
+        }
+        Vector3 centro = new Vector3(b.center.x, b.min.y + b.size.y * 0.55f, b.center.z);
+        // Eje largo de la cama en el mundo y, a partir de él, el giro en el espacio del avatar
+        Vector3 largo = b.size.x > b.size.z ? Vector3.right : Vector3.forward;
+        Vector3 local = transform.InverseTransformDirection(largo);
+        float giro = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg + GiroCama;
+        modelo.localRotation = Quaternion.Euler(0, giro, 0);
+        Vector3 p = transform.InverseTransformPoint(centro);
+        modelo.localPosition = new Vector3(p.x, p.y + caida * 0.2f, p.z);
+    }
+
+    /// <summary>Ajuste del sentido en que queda tumbado (cabeza hacia el cabecero).</summary>
+    public static float GiroCama = 180f;
 
     /// <summary>En el gimnasio: pesas solo al hacer curl (y al cogerlas del suelo), botella al beber.</summary>
     private void AccesoriosRutina()

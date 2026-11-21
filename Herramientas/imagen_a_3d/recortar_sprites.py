@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 RAIZ = Path(__file__).resolve().parents[2]
 ENTRADA = RAIZ / "_descargas" / "flow_3d"
-SALIDA = RAIZ / "MyLifesGame" / "Assets" / "_Juego" / "Arte" / "Resources" / "Sprites"
+SALIDA = RAIZ / "MyLifesGame" / "Assets" / "_Juego" / "Arte" / "SpritesFlow"  # fuera de Resources: no entra en el juego
 NO_SPRITE = ("personaje", "textura_", "mancuerna", "libro", "mando", "botella", "mochila",
              "gorra", "gorro", "gafas", "auriculares", "reloj")
 MAXIMO = 512

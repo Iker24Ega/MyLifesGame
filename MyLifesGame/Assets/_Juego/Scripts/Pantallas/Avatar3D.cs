@@ -47,7 +47,7 @@ public class Avatar3D : MonoBehaviour
     public static readonly Color ColorSudadera = Paleta.Hex("3FA59E");
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void Reiniciar() { materiales.Clear(); }
+    private static void Reiniciar() { materiales.Clear(); texturaOriginal = null; texturasTenidas.Clear(); }
 
     public static Avatar3D Crear(Transform padre, int capa = 0)
     {
@@ -472,6 +472,85 @@ public class Avatar3D : MonoBehaviour
     {
         Color c = Paleta.Hex(colorHex);
         foreach (Material m in sudadera) { m.SetColor("_BaseColor", c); m.color = c; }
+#if UNITY_EDITOR
+        string prueba = System.IO.Path.Combine(Application.dataPath, "..", "Automatizacion", "prueba_color.txt");
+        if (System.IO.File.Exists(prueba)) colorHex = System.IO.File.ReadAllText(prueba).Trim(); // solo para revisar
+#endif
+        if (Generado) TenirSudadera(colorHex);
+    }
+
+    // ---------------------------------------------------------------- sudadera del personaje generado
+
+    private static Texture texturaOriginal;
+    private static readonly Dictionary<string, Texture> texturasTenidas = new Dictionary<string, Texture>();
+    private string colorPuesto;
+
+    /// <summary>
+    /// El personaje generado lleva la sudadera pintada en su textura (turquesa). Para cambiarla de color se tiñen
+    /// solo los píxeles de la sudadera (tono verde azulado) conservando luces, sombras y arrugas.
+    /// </summary>
+    private void TenirSudadera(string colorHex)
+    {
+        if (string.IsNullOrEmpty(colorHex) || colorHex == colorPuesto || modelo == null) return;
+        Renderer[] rs = modelo.GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return;
+        Material[] mats = rs[0].sharedMaterials;
+        if (mats.Length == 0 || mats[0] == null || !mats[0].HasProperty("_BaseMap")) return;
+        if (texturaOriginal == null) texturaOriginal = mats[0].GetTexture("_BaseMap");
+        if (texturaOriginal == null) return;
+        Texture t;
+        if (!texturasTenidas.TryGetValue(colorHex, out t))
+        {
+            t = Tenida(texturaOriginal, Paleta.Hex(colorHex));
+            texturasTenidas[colorHex] = t;
+        }
+        foreach (Renderer r in rs)
+            foreach (Material m in r.sharedMaterials)
+            {
+                if (m == null) continue;
+                m.SetTexture("_BaseMap", t);
+                if (m.HasProperty("_EmissionMap")) m.SetTexture("_EmissionMap", t);
+            }
+        colorPuesto = colorHex;
+    }
+
+    private static Texture Tenida(Texture origen, Color destino)
+    {
+        // Turquesa original de la hoja de personaje: no hace falta teñir
+        float hd, sd, vd;
+        Color.RGBToHSV(destino, out hd, out sd, out vd);
+        Color.RGBToHSV(ColorSudadera, out float ho, out float so, out float vo);
+        if (Mathf.Abs(hd - ho) < 0.02f && Mathf.Abs(sd - so) < 0.05f) return origen;
+
+        int w = origen.width, h = origen.height;
+        var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        Graphics.Blit(origen, rt);
+        var anterior = RenderTexture.active;
+        RenderTexture.active = rt;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, true, false) { name = "Sudadera " + ColorUtility.ToHtmlStringRGB(destino) };
+        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+        RenderTexture.active = anterior;
+        RenderTexture.ReleaseTemporary(rt);
+
+        Color32[] px = tex.GetPixels32();
+        for (int i = 0; i < px.Length; i++)
+        {
+            Color c = px[i];
+            float hh, ss, vv;
+            Color.RGBToHSV(c, out hh, out ss, out vv);
+            // Tono de la sudadera (verde azulado), con color suficiente; los vaqueros (azul) y la piel quedan fuera
+            if (hh < 0.36f || hh > 0.54f || ss < 0.22f || vv < 0.08f) continue;
+            float borde = Mathf.Clamp01(Mathf.Min(hh - 0.36f, 0.54f - hh) / 0.03f) * Mathf.Clamp01((ss - 0.22f) / 0.08f);
+            float ns = Mathf.Clamp01(ss / Mathf.Max(so, 0.01f) * sd);
+            float nv = Mathf.Clamp01(vv / Mathf.Max(vo, 0.01f) * vd);
+            Color n = Color.HSVToRGB(hd, ns, nv);
+            Color mezcla = Color.Lerp(c, n, borde);
+            mezcla.a = c.a;
+            px[i] = mezcla;
+        }
+        tex.SetPixels32(px);
+        tex.Apply(true);
+        return tex;
     }
 
     public void PonerEstado(TipoEstadoAvatar estado) { estadoAvatar = estado; }
@@ -519,6 +598,7 @@ public class Avatar3D : MonoBehaviour
         float t = Time.time;
         if (cabeza != null) cabeza.localScale = Vector3.one * EscalaCabeza;
         if (Generado && calibrado < 3) Calibrar();
+
         modelo.localPosition = new Vector3(0, caida, 0);
         EscalarExtremidades(1f, 1f);
         GuardarPies();

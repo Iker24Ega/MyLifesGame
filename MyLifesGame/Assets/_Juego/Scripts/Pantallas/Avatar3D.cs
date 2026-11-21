@@ -690,7 +690,7 @@ public class Avatar3D : MonoBehaviour
         DormidoEnCama = false;
         if (Generado && Cama != null && Accion == "estirarse")
         {
-            if (clipActual == "Sleeping Idle") { TumbarEnCama(GiroCama); DormidoEnCama = true; }
+            if (clipActual == "Sleeping Idle") { TumbarEnCama(GiroCama - 90f, true); modelo.localPosition += Vector3.up * 0.07f * Altura; DormidoEnCama = true; }
             else if (clipActual == "Waking") TumbarEnCama(GiroCama + 180f);   // se incorpora mirando a la cámara
             else JuntoACama();
         }
@@ -803,10 +803,10 @@ public class Avatar3D : MonoBehaviour
         return true;
     }
 
-    private void TumbarEnCama(float giroExtra)
+    private void TumbarEnCama(float giroExtra, bool centrar = false)
     {
         if (!CajaCama(out Bounds b)) return;
-        Vector3 centro = new Vector3(b.center.x, b.min.y + b.size.y * 0.55f, b.center.z);
+        Vector3 centro = new Vector3(b.center.x, b.min.y + b.size.y * 0.4f, b.center.z);
         // Eje largo de la cama en el mundo y, a partir de él, el giro en el espacio del avatar
         Vector3 largo = b.size.x > b.size.z ? Vector3.right : Vector3.forward;
         Vector3 local = transform.InverseTransformDirection(largo);
@@ -814,6 +814,19 @@ public class Avatar3D : MonoBehaviour
         modelo.localRotation = Quaternion.Euler(0, giro, 0);
         Vector3 p = transform.InverseTransformPoint(centro);
         modelo.localPosition = new Vector3(p.x, p.y + caida * 0.2f, p.z);
+        // Centrar el cuerpo (de la cabeza a los pies) en la cama: la cadera no está en medio del cuerpo tumbado
+        if (centrar && animador != null && animador.isHuman)
+        {
+            Transform c = animador.GetBoneTransform(HumanBodyBones.Head);
+            Transform pi = animador.GetBoneTransform(HumanBodyBones.LeftFoot);
+            Transform pd = animador.GetBoneTransform(HumanBodyBones.RightFoot);
+            if (c != null && pi != null && pd != null)
+            {
+                Vector3 medio = (c.position + (pi.position + pd.position) * 0.5f) * 0.5f;
+                Vector3 desvio = centro - medio; desvio.y = 0;
+                modelo.position += desvio;
+            }
+        }
     }
 
     /// <summary>Ya levantado: de pie al lado de la cama (el lado que da a la cámara), mirando a la cámara.</summary>

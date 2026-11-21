@@ -131,6 +131,17 @@ public static class EstudioAvatar
             // En el dormitorio, el avatar empieza tumbado en la cama (dormido) y se levanta
             Transform cama = null;
             foreach (Transform t in cont.GetComponentsInChildren<Transform>(true)) if (t.name == "bedSingle") cama = t;
+            if (cama != null && accion == "checkin")
+            {
+                // Cabecero contra la pared (la cama de Kenney viene con el cabecero hacia la cámara)
+                Renderer[] rc = cama.GetComponentsInChildren<Renderer>();
+                if (rc.Length > 0)
+                {
+                    Bounds bc = rc[0].bounds;
+                    foreach (Renderer r in rc) bc.Encapsulate(r.bounds);
+                    cama.RotateAround(bc.center, Vector3.up, 180f);
+                }
+            }
             avatar.Cama = cama;
             foreach (Transform t in cont.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = CapaEscena;
             salaActual = sala; accionSala = accion;

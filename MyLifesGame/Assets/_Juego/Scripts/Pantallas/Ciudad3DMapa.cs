@@ -135,12 +135,14 @@ public partial class Ciudad3D
             Cinta("Calle", l, 6.6f, 0.05f, matAdoquin, mAdoquin);
         }
 
-        // Plaza de adoquín alrededor de la fuente (con un borde de acera)
+        // Plaza de adoquín alrededor de la fuente, un escalón por encima (con un borde de acera)
         Poligono("Acera plaza", PlanoPlaza, 1.5f, 0.03f, matAcera, mAcera);
-        Poligono("Plaza", PlanoPlaza, 0f, 0.06f, matAdoquin, mAdoquin);
+        Poligono("Plaza", PlanoPlaza, 0f, 0.2f, matAdoquin, mAdoquin);
+        Escalon(PlanoPlaza, 0f, 0.2f, Mat(Paleta.Hex("D8CCBA")));
         PlazaFuente();
 
         RioYPuente();
+        Bordillos();
 
         // Parcelas de los solares (césped con borde de piedra)
         for (int i = 0; i < PlanoSolares.Length; i++)
@@ -160,6 +162,18 @@ public partial class Ciudad3D
         }
 
         AmbienteMapa();
+#if UNITY_EDITOR
+        int sombras = 0, franjas = 0;
+        string ej = "";
+        foreach (Transform t in transform)
+        {
+            if (t.name == "Sombra") { sombras++; if (ej == "") { var rr = t.GetComponent<Renderer>(); ej = " ej: pos=" + t.position + " esc=" + t.localScale + " shader=" + (rr.sharedMaterial != null && rr.sharedMaterial.shader != null ? rr.sharedMaterial.shader.name + " soportado=" + rr.sharedMaterial.shader.isSupported : "null") + " color=" + rr.sharedMaterial.color + " capa=" + t.gameObject.layer + " activo=" + t.gameObject.activeInHierarchy + " bounds=" + rr.bounds; } }
+            if (t.name.StartsWith("Muro") || t.name.StartsWith("Bordillo")) franjas++;
+        }
+        sombras = sombras * 1; franjas += 0;
+        ej += " cam=" + (camara != null ? camara.transform.position.ToString() : "-");
+        try { System.IO.File.WriteAllText(System.IO.Path.Combine(Application.dataPath, "..", "Automatizacion", "diag_mapa.txt"), "sombras=" + sombras + " franjas=" + franjas + " calidad=" + QualitySettings.GetQualityLevel() + " distSombras=" + QualitySettings.shadowDistance + ej + "\n"); } catch (System.Exception) { }
+#endif
     }
 
     /// <summary>Parcela cuadrada alineada con la vista (los edificios quedan ordenados, como en la imagen).</summary>
@@ -191,6 +205,7 @@ public partial class Ciudad3D
     /// <summary>Casa de relleno: la generada (Flow → 3D) si existe; si no, una de Kenney.</summary>
     private void CasaRelleno(Vector3 p, int k)
     {
+        SombraContacto(p, 7.2f, 0.3f);
         for (int i = 0; i < ModelosRelleno.Length; i++)
         {
             string n = ModelosRelleno[(k * 3 + i) % ModelosRelleno.Length];
@@ -207,11 +222,17 @@ public partial class Ciudad3D
     private void RioYPuente()
     {
         rioMundo = Suave(PlanoRio, 2f);
-        Cinta("Orilla", rioMundo, 9.4f, 0.04f, Mat(Paleta.Hex("D9CDBA")), 4f);
-        Cinta("Muro", rioMundo, 8.2f, 0.07f, Mat(Paleta.Hex("CFC2AE")), 4f);
-        Material matAgua = new Material(Mat(Paleta.Hex("8FD0EE")));
-        matAgua.SetFloat("_Smoothness", 0.8f);
-        Cinta("Agua", rioMundo, 7f, 0.09f, matAgua, 4f);
+        Cinta("Orilla", rioMundo, 10f, 0.04f, Mat(Paleta.Hex("D9CDBA")), 4f);
+        Material matAgua = new Material(Mat(Paleta.Hex("7CC4E8")));
+        matAgua.SetFloat("_Smoothness", 0.85f);
+        Cinta("Agua", rioMundo, 7.6f, 0.06f, matAgua, 4f);
+        // Muros de piedra a ambos lados (el agua queda "metida" entre ellos), abiertos solo en los puentes
+        Vector3 puente = W(PlanoPuente.x, PlanoPuente.y);
+        List<Vector3> carretera = carreteraMundo;
+        System.Func<int, bool> abrir = i => (rioMundo[i] - puente).sqrMagnitude < 30f || DistanciaA(carretera, rioMundo[i]) < 7f;
+        Material piedra = Mat(Paleta.Hex("E1D6C4")), cara = Mat(Paleta.Hex("C4B6A0"));
+        Franja("Muro río", rioMundo, 4.25f, 0.9f, 0.02f, 0.75f, piedra, cara, abrir);
+        Franja("Muro río", rioMundo, -4.25f, 0.9f, 0.02f, 0.75f, piedra, cara, abrir);
         // Nenúfares
         for (int i = 2; i < rioMundo.Count - 2; i += 5)
             Modelo("Ciudad/Naturaleza/" + (i % 2 == 0 ? "lily_large" : "lily_small"), transform, rioMundo[i] + Lateral(rioMundo, i) * ((i * 13 % 5 - 2) * 0.6f) + Vector3.up * 0.1f, 0.9f, i * 40f);
@@ -262,6 +283,201 @@ public partial class Ciudad3D
             Pieza(PrimitiveType.Cube, "Pretil", m + new Vector3(ancho / 2, 0.5f, 0), new Vector3(0.45f, 0.75f, l), clara, p).transform.localRotation = Quaternion.Euler(-ang, 0, 0);
         }
         Pieza(PrimitiveType.Cylinder, "Arco", new Vector3(0, -0.9f, 0), new Vector3(3.2f, ancho * 0.5f, 3.2f), Paleta.Hex("BFB3A2"), p).transform.localRotation = Quaternion.Euler(0, 0, 90);
+    }
+
+    // ---------------------------------------------------------------- relieve
+
+    /// <summary>
+    /// Bordillos redondeados a ambos lados de cada calle y de la carretera (como en la imagen de Flow), salvo en los
+    /// cruces, en la plaza y en los puentes, para que nada corte el paso.
+    /// </summary>
+    private void Bordillos()
+    {
+        Material piedra = Mat(Paleta.Hex("E3D8C7"));
+        Material sombra = Mat(Paleta.Hex("B9AC98"));
+        for (int c = 0; c < callesMundo.Count; c++)
+        {
+            List<Vector3> l = callesMundo[c];
+            int cc = c;
+            System.Func<int, bool> cortar = i =>
+            {
+                Vector3 p = l[i];
+                if (DentroPlaza(p, 2.5f)) return true;
+                if (DistanciaA(rioMundo, p) < 6.5f) return true;
+                if (DistanciaA(carreteraMundo, p) < 9f) return true;
+                for (int o = 0; o < callesMundo.Count; o++) if (o != cc && DistanciaA(callesMundo[o], p) < 6.5f) return true;
+                return false;
+            };
+            Franja("Bordillo", l, 3.45f, 0.55f, 0.05f, 0.2f, piedra, sombra, cortar);
+            Franja("Bordillo", l, -3.45f, 0.55f, 0.05f, 0.2f, piedra, sombra, cortar);
+        }
+        System.Func<int, bool> cortarCarretera = i =>
+        {
+            Vector3 p = carreteraMundo[i];
+            if (DistanciaA(rioMundo, p) < 8f) return true;
+            foreach (List<Vector3> l in callesMundo) if (DistanciaA(l, p) < 6f) return true;
+            return false;
+        };
+        Franja("Bordillo", carreteraMundo, 4.75f, 0.6f, 0.11f, 0.22f, piedra, sombra, cortarCarretera);
+        Franja("Bordillo", carreteraMundo, -4.75f, 0.6f, 0.11f, 0.22f, piedra, sombra, cortarCarretera);
+    }
+
+    /// <summary>
+    /// Franja con volumen a un lado de una línea (bordillo, muro): cara de arriba y caras laterales,
+    /// cortada donde <paramref name="cortar"/> lo pida.
+    /// </summary>
+    private void Franja(string nombre, List<Vector3> linea, float lado, float ancho, float yBase, float alto,
+                        Material arriba, Material costado, System.Func<int, bool> cortar)
+    {
+        var tramo = new List<int>();
+        for (int i = 0; i <= linea.Count; i++)
+        {
+            bool fin = i == linea.Count || (cortar != null && cortar(i));
+            if (!fin) { tramo.Add(i); continue; }
+            if (tramo.Count >= 2) MallaFranja(nombre, linea, tramo, lado, ancho, yBase, alto, arriba, costado);
+            tramo.Clear();
+        }
+    }
+
+    private void MallaFranja(string nombre, List<Vector3> linea, List<int> idx, float lado, float ancho, float yBase, float alto,
+                             Material arriba, Material costado)
+    {
+        int n = idx.Count;
+        // 4 aristas por sección: interior abajo, interior arriba, exterior arriba, exterior abajo (arriba ligeramente biselado)
+        var v = new List<Vector3>();
+        var triArriba = new List<int>();
+        var triLado = new List<int>();
+        float bisel = Mathf.Min(0.12f, ancho * 0.25f);
+        for (int k = 0; k < n; k++)
+        {
+            int i = idx[k];
+            Vector3 lat = Lateral(linea, i);
+            Vector3 c = linea[i] + lat * lado;
+            Vector3 hacia = lat * Mathf.Sign(lado == 0 ? 1 : lado);
+            Vector3 interior = c - hacia * (ancho * 0.5f), exterior = c + hacia * (ancho * 0.5f);
+            v.Add(interior + Vector3.up * yBase);                                    // 0 interior abajo
+            v.Add(interior + hacia * bisel + Vector3.up * (yBase + alto));           // 1 interior arriba (biselado)
+            v.Add(exterior - hacia * bisel + Vector3.up * (yBase + alto));           // 2 exterior arriba
+            v.Add(exterior + Vector3.up * yBase);                                    // 3 exterior abajo
+        }
+        for (int k = 0; k < n - 1; k++)
+        {
+            int a = k * 4, b = (k + 1) * 4;
+            Quad(triArriba, a + 1, b + 1, b + 2, a + 2);
+            Quad(triLado, a + 0, b + 0, b + 1, a + 1);
+            Quad(triLado, a + 2, b + 2, b + 3, a + 3);
+        }
+        var m = new Mesh { name = nombre };
+        m.SetVertices(v);
+        m.subMeshCount = 2;
+        m.SetTriangles(triArriba, 0);
+        m.SetTriangles(triLado, 1);
+        m.RecalculateNormals();
+        // Si las normales salen hacia abajo, se da la vuelta a las caras
+        if (m.normals[1].y < 0)
+        {
+            triArriba.Reverse(); triLado.Reverse();
+            m.SetTriangles(triArriba, 0); m.SetTriangles(triLado, 1);
+            m.RecalculateNormals();
+        }
+        var go = new GameObject(nombre, typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(transform, false);
+        go.GetComponent<MeshFilter>().sharedMesh = m;
+        var r = go.GetComponent<MeshRenderer>();
+        r.sharedMaterials = new[] { arriba, costado };
+        r.shadowCastingMode = ShadowCastingMode.On;
+    }
+
+    private static void Quad(List<int> t, int a, int b, int c, int d)
+    {
+        t.Add(a); t.Add(b); t.Add(c);
+        t.Add(a); t.Add(c); t.Add(d);
+    }
+
+    /// <summary>Paredes del escalón de un suelo con forma de polígono (la plaza).</summary>
+    private void Escalon(Vector2[] plano, float crecer, float alto, Material mat)
+    {
+        Vector2 c = Vector2.zero;
+        foreach (Vector2 q in plano) c += q;
+        c /= plano.Length;
+        var v = new List<Vector3>();
+        var t = new List<int>();
+        for (int i = 0; i < plano.Length; i++)
+        {
+            Vector2 a2 = plano[i] + (plano[i] - c).normalized * crecer;
+            Vector2 b2 = plano[(i + 1) % plano.Length] + (plano[(i + 1) % plano.Length] - c).normalized * crecer;
+            Vector3 a = W(a2.x, a2.y), b = W(b2.x, b2.y);
+            int k = v.Count;
+            v.Add(a); v.Add(b); v.Add(b + Vector3.up * alto); v.Add(a + Vector3.up * alto);
+            // hacia fuera: el orden depende del sentido del polígono; se ponen las dos caras
+            Quad(t, k, k + 1, k + 2, k + 3);
+            Quad(t, k + 3, k + 2, k + 1, k);
+        }
+        var m = new Mesh { name = "Escalón" };
+        m.SetVertices(v); m.SetTriangles(t, 0); m.RecalculateNormals();
+        var go = new GameObject("Escalón plaza", typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(transform, false);
+        go.GetComponent<MeshFilter>().sharedMesh = m;
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+    }
+
+    // ---------------------------------------------------------------- sombras de contacto
+
+    private const bool SombrasContactoActivas = false;
+    private static Texture2D texSombra;
+    private readonly Dictionary<int, Material> matsSombra = new Dictionary<int, Material>();
+    private static Mesh mallaSombra;
+
+    /// <summary>
+    /// Sombra suave y redonda en el suelo bajo un objeto (imita la oclusión ambiental de las imágenes de Flow:
+    /// todo "pisa" el suelo). Barata: un cuadro con degradado.
+    /// </summary>
+    private void SombraContacto(Vector3 p, float radio, float fuerza = 0.42f, float alargar = 1f)
+    {
+        // Desactivado: en la ciudad no llegan a verse (pendiente de averiguar por qué); las sombras reales del sol sí
+        if (!SombrasContactoActivas) return;
+        if (texSombra == null)
+        {
+            const int N = 64;
+            texSombra = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float dx = (x + 0.5f) / N * 2f - 1f, dy = (y + 0.5f) / N * 2f - 1f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a = Mathf.Clamp01(1f - d);
+                    px[y * N + x] = new Color(0.25f, 0.17f, 0.1f, a * a * (3f - 2f * a));
+                }
+            texSombra.SetPixels(px); texSombra.Apply();
+        }
+        int clave = Mathf.RoundToInt(fuerza * 20f);
+        Material m;
+        if (!matsSombra.TryGetValue(clave, out m))
+        {
+            m = new Material(Shader.Find("Sprites/Default")) { mainTexture = texSombra, color = new Color(1, 1, 1, clave / 20f), renderQueue = 2460 }; // después del suelo opaco, antes de lo transparente
+            matsSombra[clave] = m;
+        }
+        // Malla propia, plana y con colores de vértice (blancos): la sombra mira hacia arriba
+        var go = new GameObject("Sombra", typeof(MeshFilter), typeof(MeshRenderer));
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = new Vector3(p.x, 0.3f, p.z);
+        go.transform.localRotation = Quaternion.Euler(0, GiroCamara, 0);
+        if (mallaSombra == null)
+        {
+            mallaSombra = new Mesh { name = "Sombra" };
+            mallaSombra.vertices = new[] { new Vector3(-1, 0, -1), new Vector3(1, 0, -1), new Vector3(-1, 0, 1), new Vector3(1, 0, 1) };
+            mallaSombra.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1), new Vector2(1, 1) };
+            mallaSombra.colors = new[] { Color.white, Color.white, Color.white, Color.white };
+            mallaSombra.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+            mallaSombra.RecalculateNormals(); mallaSombra.RecalculateBounds();
+        }
+        go.GetComponent<MeshFilter>().sharedMesh = mallaSombra;
+        go.transform.localScale = new Vector3(radio * alargar, 1f, radio);
+        var r = go.GetComponent<MeshRenderer>();
+        r.sharedMaterial = m;
+        r.shadowCastingMode = ShadowCastingMode.Off;
+        r.receiveShadows = false;
     }
 
     // ---------------------------------------------------------------- ambiente
@@ -323,6 +539,7 @@ public partial class Ciudad3D
         if (!Modelos3D.Existe("bici")) return;
         GameObject g = Modelos3D.Crear("bici", transform, 2.1f);
         g.transform.localPosition = p;
+        SombraContacto(p, 1.1f, 0.28f, 1.5f);
         g.transform.localRotation = Quaternion.Euler(0, giro, 0);
     }
 

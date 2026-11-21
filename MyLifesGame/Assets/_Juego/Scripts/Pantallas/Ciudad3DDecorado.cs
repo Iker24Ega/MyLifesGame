@@ -206,6 +206,7 @@ public partial class Ciudad3D
 
     private void Farola(Vector3 p)
     {
+        SombraContacto(Curva(p), 0.9f, 0.3f);
         if (Sprite2D("farola", transform, Curva(p), 4.6f, true) != null) return;
         Color hierro = Paleta.Hex("3E4B4A");
         Transform f = new GameObject("Farola").transform;
@@ -232,6 +233,7 @@ public partial class Ciudad3D
         {
             GameObject g = Modelos3D.Crear("banco", transform, 2.3f);
             g.transform.localPosition = Curva(p);
+            SombraContacto(Curva(p), 1.4f, 0.32f, 1.3f);
             g.transform.localRotation = Quaternion.Euler(0, giro, 0);
             return;
         }
@@ -278,8 +280,10 @@ public partial class Ciudad3D
     {
         if (Modelos3D.Existe("arbol"))
         {
-            GameObject g = Modelos3D.Crear("arbol", padre, tam * 1.25f * (0.88f + ((k * 37) % 10) * 0.03f), Modelos3D.Medida.Alto);
+            float altoArbol = tam * 1.25f * (0.88f + ((k * 37) % 10) * 0.03f);
+            GameObject g = Modelos3D.Crear("arbol", padre, altoArbol, Modelos3D.Medida.Alto);
             g.transform.localPosition = p;
+            if (padre == transform) SombraContacto(p, altoArbol * 0.38f, 0.38f);
             g.transform.localRotation = Quaternion.Euler(0, k * 47f, 0);
             return;
         }
@@ -303,6 +307,7 @@ public partial class Ciudad3D
         {
             GameObject g = Modelos3D.Crear("arbusto_flores", transform, 1.5f + (k % 3) * 0.25f, Modelos3D.Medida.Alto);
             g.transform.localPosition = Curva(p);
+            SombraContacto(Curva(p), 1.3f, 0.3f);
             g.transform.localRotation = Quaternion.Euler(0, k * 53f, 0);
             return;
         }

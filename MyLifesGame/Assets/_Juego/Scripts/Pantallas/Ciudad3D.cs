@@ -98,6 +98,7 @@ public partial class Ciudad3D : MonoBehaviour
             col.center = s.centro + new Vector3(0, 6f, 0);
             col.size = new Vector3(11f, 12f, 11f);
             CrearMedallon(s);
+            SombraContacto(s.centro, 7.4f, 0.3f);
             solares.Add(s);
         }
 
@@ -117,7 +118,7 @@ public partial class Ciudad3D : MonoBehaviour
         camara.clearFlags = CameraClearFlags.SolidColor;
         camara.backgroundColor = Paleta.Hex("F6E7CF");
         camara.farClipPlane = 400f;
-        camara.nearClipPlane = 1f;
+        camara.nearClipPlane = 8f; // la cámara está lejos: un plano cercano mayor da precisión de profundidad (sombras y bordillos no parpadean)
         camara.cullingMask &= ~((1 << EstudioAvatar.Capa) | (1 << EstudioAvatar.CapaEscena));
         var datosCam = camara.GetUniversalAdditionalCameraData();
         if (datosCam != null)
@@ -140,8 +141,13 @@ public partial class Ciudad3D : MonoBehaviour
         sol.transform.rotation = Quaternion.Euler(42f, -38f, 0f);
         sol.color = Paleta.Hex("FFE1B5");
         sol.intensity = 1.35f;
+        // Sombras hasta lejos (la cámara de la ciudad está a ~95 m del suelo; el ajuste del proyecto llegaba a 50)
+        var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        if (urp != null) urp.shadowDistance = 220f;
         sol.shadows = LightShadows.Soft;
-        sol.shadowStrength = 0.55f;
+        sol.shadowStrength = 0.68f;
+        sol.shadowBias = 0.06f;
+        sol.shadowNormalBias = 0.5f;
 
         RenderSettings.ambientMode = AmbientMode.Trilight;
         RenderSettings.ambientSkyColor = Paleta.Hex("C9DDF2");

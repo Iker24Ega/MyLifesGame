@@ -49,6 +49,17 @@ public class CapturadorPantallas : MonoBehaviour
         j.TerminarBienvenida(new float[] { 50, 50, 40, 75, 50 }, "teal");
         yield return Esperar(0.6f);
         yield return Captura("01_checkin");
+        // Secuencia del despertar (para revisar la animación en la cama)
+        string[] letras = { "b", "c", "d", "e", "f", "g", "h", "i" };
+        for (int k = 0; k < letras.Length; k++)
+        {
+            yield return Esperar(1.5f);
+            Avatar3D av = null;
+            foreach (Avatar3D a3 in UnityEngine.Object.FindObjectsByType<Avatar3D>(FindObjectsSortMode.None)) if (a3.Cama != null) av = a3;
+            File.AppendAllText(Path.Combine(carpetaCapturas, "checkin_clips.txt"),
+                letras[k] + ": " + (av != null ? av.ClipActual : "?") + "\n");
+            yield return Captura("01" + letras[k] + "_checkin");
+        }
 
         j.CompletarCheckIn(3, 3, new List<Area> { Area.Fisico, Area.Social }, false);
         j.AsignarRol(0, "gimnasio");

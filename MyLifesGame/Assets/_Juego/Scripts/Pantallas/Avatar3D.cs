@@ -610,7 +610,7 @@ public class Avatar3D : MonoBehaviour
         { "entrenar", new[] { new Paso("Picking Up", 0), new Paso("Bicep Curl", 9), new Paso("Drinking", 0), new Paso("Bicep Curl", 9),
                               new Paso("Wiping Sweat", 0), new Paso("Push Up", 7), new Paso("Air Squat", 7), new Paso("Drinking", 0) } },
         { "celebrar", new[] { new Paso("Breathing Idle", 2.4f), new Paso("Victory", 0), new Paso("Cheering", 4.5f), new Paso("Idle", 9999) } },
-        { "estirarse", new[] { new Paso("Sleeping Idle", 1.6f), new Paso("Waking", 0), new Paso("Arm Stretching", 0), new Paso("Idle", 9999) } },
+        { "estirarse", new[] { new Paso("Sleeping Idle", 1.6f), new Paso("Waking", 0), new Paso("Arm Stretching", 0), new Paso("Breathing Idle", 9999) } },
         { "quedar", new[] { new Paso("Stand To Sit", 0), new Paso("Sitting Talking", 9999) } },
         { "trabajar", new[] { new Paso("Stand To Sit", 0), new Paso("Typing", 9999) } },
         { "estudiar", new[] { new Paso("Stand To Sit", 0), new Paso("Sitting Idle", 9999) } },
@@ -687,7 +687,13 @@ public class Avatar3D : MonoBehaviour
 
         modelo.localPosition = new Vector3(0, caida, 0);
         modelo.localRotation = Quaternion.identity;
-        if (Generado && Cama != null && (clipActual == "Sleeping Idle" || clipActual == "Waking")) TumbarEnCama();
+        DormidoEnCama = false;
+        if (Generado && Cama != null && Accion == "estirarse")
+        {
+            if (clipActual == "Sleeping Idle") { TumbarEnCama(GiroCama); DormidoEnCama = true; }
+            else if (clipActual == "Waking") TumbarEnCama(GiroCama + 180f);   // se incorpora mirando a la cámara
+            else JuntoACama();
+        }
         EscalarExtremidades(1f, 1f);
         GuardarPies();
         EscalarExtremidades(EscalaPiernas, EscalaBrazos);
@@ -778,29 +784,56 @@ public class Avatar3D : MonoBehaviour
     /// Coloca el modelo sobre el colchón, a lo largo de la cama (la animación ya lo pone tumbado).
     /// El eje largo de la cama se calcula con sus límites.
     /// </summary>
-    private void TumbarEnCama()
+    /// <summary>Caja de la cama en el mundo; la de Kenney es pequeña para el avatar y se agranda hasta que quepa holgado.</summary>
+    private bool CajaCama(out Bounds b)
     {
+        b = new Bounds();
         Renderer[] rs = Cama.GetComponentsInChildren<Renderer>();
-        if (rs.Length == 0) return;
-        Bounds b = rs[0].bounds;
+        if (rs.Length == 0) return false;
+        b = rs[0].bounds;
         foreach (Renderer r in rs) b.Encapsulate(r.bounds);
-        // La cama de Kenney es pequeña para el avatar: se agranda (una vez) hasta que quepa tumbado
         float alturaMundo = Altura * transform.lossyScale.y;
         float largoCama = Mathf.Max(b.size.x, b.size.z);
-        if (largoCama < alturaMundo * 1.12f && largoCama > 0.001f)
+        float objetivo = alturaMundo * 1.4f;
+        if (largoCama > 0.001f && Mathf.Abs(largoCama - objetivo) > objetivo * 0.03f)
         {
-            Cama.localScale *= alturaMundo * 1.18f / largoCama;
-            return; // los bounds se recalculan el siguiente fotograma
+            Cama.localScale *= objetivo / largoCama;
+            return false; // los bounds se recalculan el siguiente fotograma
         }
+        return true;
+    }
+
+    private void TumbarEnCama(float giroExtra)
+    {
+        if (!CajaCama(out Bounds b)) return;
         Vector3 centro = new Vector3(b.center.x, b.min.y + b.size.y * 0.55f, b.center.z);
         // Eje largo de la cama en el mundo y, a partir de él, el giro en el espacio del avatar
         Vector3 largo = b.size.x > b.size.z ? Vector3.right : Vector3.forward;
         Vector3 local = transform.InverseTransformDirection(largo);
-        float giro = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg + GiroCama;
+        float giro = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg + giroExtra;
         modelo.localRotation = Quaternion.Euler(0, giro, 0);
         Vector3 p = transform.InverseTransformPoint(centro);
         modelo.localPosition = new Vector3(p.x, p.y + caida * 0.2f, p.z);
     }
+
+    /// <summary>Ya levantado: de pie al lado de la cama (el lado que da a la cámara), mirando a la cámara.</summary>
+    private void JuntoACama()
+    {
+        if (!CajaCama(out Bounds b)) return;
+        bool largoEnX = b.size.x > b.size.z;
+        // Costado de la cama que queda libre y a la derecha en pantalla (en esta cámara, -x va a la derecha)
+        Vector3 lado = largoEnX ? Vector3.forward : Vector3.left;
+        float medio = largoEnX ? b.extents.z : b.extents.x;
+        Vector3 pie = b.center + lado * (medio + 0.3f * Altura * transform.lossyScale.y) + Vector3.forward * b.extents.z * (largoEnX ? 0f : 0.25f);
+        pie.y = b.min.y;
+        Vector3 haciaCamara = transform.InverseTransformDirection(new Vector3(8.5f, 0, 15.5f).normalized);
+        modelo.localRotation = Quaternion.Euler(0, Mathf.Atan2(haciaCamara.x, haciaCamara.z) * Mathf.Rad2Deg, 0);
+        Vector3 p = transform.InverseTransformPoint(pie);
+        modelo.localPosition = new Vector3(p.x, modelo.localPosition.y, p.z);
+    }
+
+    /// <summary>True mientras duerme en la cama (para el "Zzz" del check-in).</summary>
+    public static bool DormidoEnCama;
 
     /// <summary>Ajuste del sentido en que queda tumbado (cabeza hacia el cabecero).</summary>
     public static float GiroCama = 180f;

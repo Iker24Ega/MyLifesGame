@@ -43,6 +43,7 @@ public class PantallaCheckIn : Pantalla
         zzz.rectTransform.anchorMin = zzz.rectTransform.anchorMax = new Vector2(0.72f, 0.86f);
         zzz.rectTransform.sizeDelta = new Vector2(260, 120);
         zzz.raycastTarget = false;
+        zzz.gameObject.AddComponent<ZzzFlotando>();
 
         // Cabecera de la hoja: puntos de página, título y subtítulo
         RectTransform cab = UIFabrica.Fila(columna, "Cabecera", 100);
@@ -141,7 +142,7 @@ public class PantallaCheckIn : Pantalla
         EstudioAvatar.PonerEscena("checkin", -3.8f, 1.2f);
         EstudioAvatar.PonerAccion("estirarse");
         // La cama y el avatar en la parte de arriba (la hoja tapa la de abajo)
-        EstudioAvatar.EncuadrarEscena(new Vector3(4.6f, -3.6f, -1.4f), 1.05f, 15f);
+        EstudioAvatar.EncuadrarEscena(new Vector3(3.9f, -3.5f, -0.9f), 1.42f, 13f);
         titulo.text = "Buenos días";
         System.DateTime hoy = System.DateTime.Now;
         fecha.text = Dias[(int)hoy.DayOfWeek] + " " + hoy.Day + " " + Meses[hoy.Month - 1];
@@ -167,3 +168,23 @@ public class PantallaCheckIn : Pantalla
             : "¿Vienes arrastrando algo de ayer? No");
     }
 }
+
+/// <summary>El "Z z z" del check-in: flota y respira mientras el avatar duerme; se apaga al despertarse.</summary>
+public class ZzzFlotando : MonoBehaviour
+{
+    private Text texto;
+    private RectTransform rt;
+    private Vector2 base0;
+    private float alfa;
+
+    private void Awake() { texto = GetComponent<Text>(); rt = (RectTransform)transform; base0 = rt.anchoredPosition; }
+
+    private void Update()
+    {
+        float t = Time.time;
+        alfa = Mathf.MoveTowards(alfa, Avatar3D.DormidoEnCama ? 1f : 0f, Time.deltaTime * 2.5f);
+        rt.anchoredPosition = base0 + new Vector2(Mathf.Sin(t * 1.3f) * 6f, (t * 18f) % 30f);
+        Color c = texto.color; c.a = 0.85f * alfa * (0.65f + 0.35f * Mathf.Sin(t * 2.4f)); texto.color = c;
+    }
+}
+

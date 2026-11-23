@@ -210,6 +210,12 @@ def main() -> None:
                     corregir_glb(destino, copia_original=SALIDA.parent / "modelos3d_originales" / destino.name)
                 except Exception as e:
                     print(f"    (sin corrección de color: {e})")
+                if not nombre.startswith("personaje"):
+                    try:  # texturas a 512 px: la web pesa mucho y a la distancia de la ciudad no se nota
+                        from aligerar_glb import aligerar
+                        aligerar(destino)
+                    except Exception as e:
+                        print(f"    (sin aligerar: {e})")
                 datos = info_glb(destino)
                 datos.update({"vistas": [v.name for v in vistas], "semilla": args.semilla,
                               "espacio": espacio, "segundos": round(time.time() - t0)})

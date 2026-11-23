@@ -451,7 +451,7 @@ public partial class Ciudad3D : MonoBehaviour
         // 1.º la imagen de Flow tal cual (se ve igual que el diseño); 2.º el modelo 3D generado; 3.º Kenney
         if (Edificio2D(nombre, p, centro, AnchoSolar * 1.55f) != null) return true;
         if (!Modelos3D.Existe(nombre)) return false;
-        GameObject go = Modelos3D.Crear(nombre, p, AnchoSolar * 1.1f);
+        GameObject go = Modelos3D.Crear(nombre, p, AnchoSolar * 1.1f, Modelos3D.Medida.Ancho, true, true);
         go.transform.localPosition = centro;
         // El frente del modelo mira hacia la cámara de la ciudad, como en la imagen de Flow
         go.transform.localRotation = Quaternion.Euler(0, s_giroActual, 0);

@@ -1,0 +1,16 @@
+arbol 0.0
+arbusto_flores 0.035
+banco 0.0
+bici 0.0
+casa_relleno_1 0.09
+casa_relleno_2 0.115
+edificio_biblioteca 0.045
+edificio_cafe 0.07
+edificio_casa 0.11
+edificio_gimnasio 0.02
+edificio_oficina 0.0
+edificio_recreativos 0.0
+personaje_base 0.02
+relleno_casa_menta 0.11
+relleno_esquina_melocoton 0.07
+relleno_pisos_crema 0.045

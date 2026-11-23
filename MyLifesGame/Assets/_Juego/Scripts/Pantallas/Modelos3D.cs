@@ -24,6 +24,7 @@ public static class Modelos3D
         cache.Clear();
         mates.Clear();
         litUrp = null;
+        peanas = null;
     }
 
     /// <summary>¿Hay modelo con ese nombre? (p. ej. "edificio_gimnasio").</summary>
@@ -36,7 +37,7 @@ public static class Modelos3D
     /// Crea el modelo dentro de un contenedor cuyo origen es el centro de la base del modelo.
     /// <paramref name="tam"/> es el ancho mayor (edificios, parcelas) o el alto (farolas, árboles, objetos).
     /// </summary>
-    public static GameObject Crear(string nombre, Transform padre, float tam, Medida medida = Medida.Ancho, bool mate = true)
+    public static GameObject Crear(string nombre, Transform padre, float tam, Medida medida = Medida.Ancho, bool mate = true, bool hundirPeana = false)
     {
         GameObject fuente = Cargar(nombre);
         if (fuente == null) return null;
@@ -55,6 +56,12 @@ public static class Modelos3D
         // Origen del contenedor = centro de la base
         Vector3 desfase = raiz.transform.position - new Vector3(b.center.x, b.min.y, b.center.z);
         modelo.transform.position += desfase;
+        // La peana de tierra/césped del modelo generado se hunde en el suelo: así no parece una isla flotante
+        if (hundirPeana)
+        {
+            float f = Peana(nombre);
+            if (f > 0f) modelo.transform.position -= Vector3.up * b.size.y * f * 0.85f;
+        }
 
         foreach (Renderer r in rs)
         {
@@ -85,6 +92,26 @@ public static class Modelos3D
         if (g == null) return null;
         Renderer r = g.GetComponentInChildren<Renderer>();
         return r != null ? Mates(r.sharedMaterials) : null;
+    }
+
+    private static Dictionary<string, float> peanas;
+
+    /// <summary>Grosor de la peana (fracción de la altura), medido con Herramientas/imagen_a_3d/medir_bases.py.</summary>
+    public static float Peana(string nombre)
+    {
+        if (peanas == null)
+        {
+            peanas = new Dictionary<string, float>();
+            TextAsset t = Resources.Load<TextAsset>("Modelos3D/bases");
+            if (t != null)
+                foreach (string linea in t.text.Split('\n'))
+                {
+                    string[] p = linea.Trim().Split(' ');
+                    if (p.Length == 2 && float.TryParse(p[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
+                        peanas[p[0]] = v;
+                }
+        }
+        return peanas.TryGetValue(nombre, out float f) ? f : 0f;
     }
 
     private static GameObject Cargar(string nombre)

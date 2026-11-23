@@ -210,7 +210,7 @@ public partial class Ciudad3D
         {
             string n = ModelosRelleno[(k * 3 + i) % ModelosRelleno.Length];
             if (!Modelos3D.Existe(n)) continue;
-            GameObject g = Modelos3D.Crear(n, transform, AnchoSolar * 1.1f);
+            GameObject g = Modelos3D.Crear(n, transform, AnchoSolar * 1.1f, Modelos3D.Medida.Ancho, true, true);
             g.transform.localPosition = p;
             return;
         }

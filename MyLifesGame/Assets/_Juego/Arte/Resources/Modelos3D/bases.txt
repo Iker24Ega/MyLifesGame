@@ -4,6 +4,11 @@ banco 0.0
 bici 0.0
 casa_relleno_1 0.09
 casa_relleno_2 0.115
+casa_relleno_3 0.035
+casa_relleno_4 0.125
+casa_relleno_5 0.075
+casa_relleno_6 0.145
+casa_relleno_7 0.06
 edificio_biblioteca 0.045
 edificio_cafe 0.07
 edificio_casa 0.11
